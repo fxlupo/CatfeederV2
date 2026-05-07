@@ -1,0 +1,216 @@
+// =============================================================================
+// CatFeeder ESP32 – Webserver Implementation
+// =============================================================================
+#include "web.h"
+#include <ESPmDNS.h>
+
+void Web::begin(Config &c, Status &st, Sensors &se, Motors &mo, CfgManager &cm) {
+    _c = &c; _st = &st; _se = &se; _mo = &mo; _cm = &cm;
+    _wifi();
+    _routes();
+    _srv.addHandler(&_sse);
+    _srv.begin();
+    if (MDNS.begin(_c->hostname)) {
+        MDNS.addService("http", "tcp", 80);
+        Serial.printf("[Web] http://%s.local\n", _c->hostname);
+    }
+    Serial.println(F("[Web] Server OK"));
+}
+
+void Web::loop() {
+    if (millis() - _lastSSE > 2000) { _sendSSE(); _lastSSE = millis(); }
+}
+
+// ═══════════════════════ WiFi ═══════════════════════════════════════════════
+
+void Web::_wifi() {
+    if (strlen(_c->ssid) > 0) {
+        WiFi.mode(WIFI_STA);
+        WiFi.setHostname(_c->hostname);
+        WiFi.begin(_c->ssid, _c->pass);
+        Serial.printf("[WiFi] Verbinde '%s' ", _c->ssid);
+        uint32_t t0 = millis();
+        while (WiFi.status() != WL_CONNECTED && millis() - t0 < WIFI_CONNECT_TIMEOUT) {
+            delay(400); Serial.print(".");
+        }
+        if (WiFi.status() == WL_CONNECTED) {
+            _ap = false;
+            Serial.printf("\n[WiFi] OK  IP %s\n", WiFi.localIP().toString().c_str());
+            return;
+        }
+        Serial.println(F("\n[WiFi] Fehlgeschlagen"));
+    }
+    _ap = true;
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASS);
+    Serial.printf("[WiFi] AP '%s'  pw '%s'  IP %s\n",
+                  WIFI_AP_SSID, WIFI_AP_PASS, WiFi.softAPIP().toString().c_str());
+}
+
+// ═══════════════════════ SSE ════════════════════════════════════════════════
+
+void Web::_sendSSE() {
+    if (_sse.count() == 0) return;
+    JsonDocument d;
+    d["v"]   = _st->busV;
+    d["ma"]  = _st->currentMA;
+    d["mw"]  = _st->powerMW;
+    d["mm"]  = _st->distMM;
+    d["fl"]  = _st->fillPct;
+    d["ang"] = _st->angleDeg;
+    d["t"]   = _st->timeStr;
+    d["up"]  = _st->uptimeS;
+    d["hp"]  = _st->heap;
+    d["fc"]  = _st->feeds;
+
+    JsonObject ir = d["ir"].to<JsonObject>();
+    ir["a1"] = _st->ir1Analog;  ir["a2"] = _st->ir2Analog;
+    ir["d1"] = _st->ir1Digital; ir["d2"] = _st->ir2Digital;
+
+    JsonObject sw = d["sw"].to<JsonObject>();
+    sw["1o"] = _st->s1Open;  sw["1c"] = _st->s1Close;
+    sw["2o"] = _st->s2Open;  sw["2c"] = _st->s2Close;
+
+    JsonObject er = d["er"].to<JsonObject>();
+    er["i"] = !_st->ok_ina; er["v"] = !_st->ok_vl;
+    er["a"] = !_st->ok_as;  er["r"] = !_st->ok_rtc;
+    er["oc"]= _st->overcurrent; er["lo"]= _st->fillLow;
+
+    String j; serializeJson(d, j);
+    _sse.send(j.c_str(), "s", millis());
+}
+
+// ═══════════════════════ Routen ═════════════════════════════════════════════
+
+void Web::_routes() {
+    // Hauptseite
+    _srv.on("/", HTTP_GET, [this](AsyncWebServerRequest *r) {
+        r->send(200, "text/html", _html());
+    });
+
+    // GET Status
+    _srv.on("/api/status", HTTP_GET, [this](AsyncWebServerRequest *r) {
+        JsonDocument d;
+        d["v"]=_st->busV; d["ma"]=_st->currentMA; d["mw"]=_st->powerMW;
+        d["mm"]=_st->distMM; d["fl"]=_st->fillPct; d["ang"]=_st->angleDeg;
+        d["t"]=_st->timeStr; d["up"]=_st->uptimeS; d["hp"]=_st->heap;
+        d["fc"]=_st->feeds; d["fw"]=FW_VERSION;
+        String j; serializeJson(d, j);
+        r->send(200, "application/json", j);
+    });
+
+    // GET Config
+    _srv.on("/api/config", HTTP_GET, [this](AsyncWebServerRequest *r) {
+        JsonDocument d;
+        JsonArray sl = d["slots"].to<JsonArray>();
+        for (int i = 0; i < MAX_SLOTS; i++) {
+            JsonObject o = sl.add<JsonObject>();
+            o["on"] = _c->slots[i].active;
+            o["h"]  = _c->slots[i].hour;
+            o["m"]  = _c->slots[i].minute;
+            o["g"]  = _c->slots[i].grams;
+            o["sv"] = _c->slots[i].servo;
+        }
+        d["spg"]=_c->stepsPerGram; d["spd"]=_c->stepperSpeed;
+        d["s1o"]=_c->s1Open; d["s1c"]=_c->s1Close;
+        d["s2o"]=_c->s2Open; d["s2c"]=_c->s2Close;
+        d["feM"]=_c->fillEmptyMM; d["ffM"]=_c->fillFullMM;
+        d["irt"]=_c->irThreshold;
+        d["tz"]=_c->utcOffset; d["dst"]=_c->dst;
+        d["hn"]=_c->hostname;
+        String j; serializeJson(d, j);
+        r->send(200, "application/json", j);
+    });
+
+    // POST Config
+    auto bodyHandler = [](AsyncWebServerRequest *r) {};
+
+    _srv.on("/api/config", HTTP_POST, bodyHandler, NULL,
+        [this](AsyncWebServerRequest *r, uint8_t *d, size_t l, size_t, size_t) {
+        JsonDocument doc; if (deserializeJson(doc, d, l)) { r->send(400); return; }
+        if (!doc["slots"].isNull()) {
+            JsonArray sl = doc["slots"];
+            for (int i = 0; i < min((int)sl.size(), MAX_SLOTS); i++) {
+                _c->slots[i].active = sl[i]["on"] | false;
+                _c->slots[i].hour   = sl[i]["h"]  | 0;
+                _c->slots[i].minute = sl[i]["m"]  | 0;
+                _c->slots[i].grams  = sl[i]["g"]  | 20;
+                _c->slots[i].servo  = sl[i]["sv"] | 0;
+            }
+        }
+        if (!doc["spg"].isNull()) _c->stepsPerGram = doc["spg"];
+        if (!doc["spd"].isNull()) _c->stepperSpeed = doc["spd"];
+        if (!doc["s1o"].isNull()) _c->s1Open   = doc["s1o"];
+        if (!doc["s1c"].isNull()) _c->s1Close  = doc["s1c"];
+        if (!doc["s2o"].isNull()) _c->s2Open   = doc["s2o"];
+        if (!doc["s2c"].isNull()) _c->s2Close  = doc["s2c"];
+        if (!doc["feM"].isNull()) _c->fillEmptyMM = doc["feM"];
+        if (!doc["ffM"].isNull()) _c->fillFullMM  = doc["ffM"];
+        if (!doc["irt"].isNull()) _c->irThreshold  = doc["irt"];
+        if (!doc["tz"].isNull())  _c->utcOffset    = doc["tz"];
+        if (!doc["dst"].isNull()) _c->dst          = doc["dst"];
+        if (!doc["hn"].isNull()) {
+            strlcpy(_c->hostname, doc["hn"] | "catfeeder", sizeof(_c->hostname));
+        }
+        _cm->save(*_c);
+        r->send(200, "application/json", "{\"ok\":1}");
+    });
+
+    // POST Feed
+    _srv.on("/api/feed", HTTP_POST, bodyHandler, NULL,
+        [this](AsyncWebServerRequest *r, uint8_t *d, size_t l, size_t, size_t) {
+        JsonDocument doc; deserializeJson(doc, d, l);
+        feedGrams     = doc["g"] | 20;
+        feedServo     = doc["sv"]| 0;
+        feedRequested = true;
+        r->send(200, "application/json", "{\"ok\":1}");
+    });
+
+    // POST Servo test
+    _srv.on("/api/sv", HTTP_POST, bodyHandler, NULL,
+        [this](AsyncWebServerRequest *r, uint8_t *d, size_t l, size_t, size_t) {
+        JsonDocument doc; deserializeJson(doc, d, l);
+        _mo->setAngle(doc["n"]|1, doc["a"]|90);
+        r->send(200, "application/json", "{\"ok\":1}");
+    });
+
+    // POST Stepper test
+    _srv.on("/api/stp", HTTP_POST, bodyHandler, NULL,
+        [this](AsyncWebServerRequest *r, uint8_t *d, size_t l, size_t, size_t) {
+        JsonDocument doc; deserializeJson(doc, d, l);
+        _mo->setSpeed(_c->stepperSpeed);
+        _mo->run(doc["s"]|100);
+        r->send(200, "application/json", "{\"ok\":1}");
+    });
+
+    // POST Time sync
+    _srv.on("/api/time", HTTP_POST, bodyHandler, NULL,
+        [this](AsyncWebServerRequest *r, uint8_t *d, size_t l, size_t, size_t) {
+        JsonDocument doc; deserializeJson(doc, d, l);
+        _se->setTime(doc["y"]|2025, doc["mo"]|1, doc["d"]|1,
+                     doc["h"]|0, doc["mi"]|0, doc["s"]|0);
+        r->send(200, "application/json", "{\"ok\":1}");
+    });
+
+    // POST WiFi
+    _srv.on("/api/wifi", HTTP_POST, bodyHandler, NULL,
+        [this](AsyncWebServerRequest *r, uint8_t *d, size_t l, size_t, size_t) {
+        JsonDocument doc; deserializeJson(doc, d, l);
+        strlcpy(_c->ssid, doc["ssid"] | "", sizeof(_c->ssid));
+        strlcpy(_c->pass, doc["pw"] | "", sizeof(_c->pass));
+        _cm->save(*_c);
+        r->send(200, "application/json", "{\"ok\":1,\"msg\":\"Neustart…\"}");
+        delay(2000); ESP.restart();
+    });
+
+    // POST Reset
+    _srv.on("/api/reset", HTTP_POST, [this](AsyncWebServerRequest *r) {
+        _cm->defaults(*_c); _cm->save(*_c);
+        r->send(200, "application/json", "{\"ok\":1}");
+        delay(1500); ESP.restart();
+    });
+
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin",  "*");
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type");
+}

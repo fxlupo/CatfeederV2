@@ -42,15 +42,51 @@ static void notifyEvent(const char *event) {
 }
 
 // ─── WhatsApp Benachrichtigung ───────────────────────────────────────────────
+// Läuft als eigener FreeRTOS-Task auf Core 0 (WiFi-Core) damit der Haupt-Loop
+// nicht durch den blockierenden HTTPS-Aufruf einfriert.
+
+struct WaTaskArg {
+    struct { char phone[20]; char apikey[32]; } users[WA_USERS];
+    char msg[200];
+};
+
+static TaskHandle_t _waTaskHandle = NULL;
+
+static void _whatsappTask(void *pvArg) {
+    WaTaskArg *a = static_cast<WaTaskArg*>(pvArg);
+    for (int i = 0; i < WA_USERS; i++) {
+        if (strlen(a->users[i].phone) == 0) continue;
+        Serial.printf("[WA] Sende an %s...\n", a->users[i].phone);
+        Callmebot.whatsappMessage(a->users[i].phone, a->users[i].apikey, a->msg);
+        Serial.println(F("[WA] OK"));
+    }
+    delete a;
+    _waTaskHandle = NULL;
+    vTaskDelete(NULL);
+}
 
 static void sendWhatsAppAlert(const char *msg) {
     if (web.apMode()) return;
+    if (_waTaskHandle != NULL) {
+        Serial.println(F("[WA] Task läuft noch – übersprungen"));
+        return;
+    }
+    WaTaskArg *a = new WaTaskArg{};
+    if (!a) { Serial.println(F("[WA] Heap-Fehler")); return; }
+    strlcpy(a->msg, msg, sizeof(a->msg));
     for (int i = 0; i < WA_USERS; i++) {
         const Config::WaUser &u = cfg.waUsers[i];
         if (!u.active || strlen(u.phone) == 0 || strlen(u.apikey) == 0) continue;
-        Serial.printf("[WA] Sende an %s...\n", u.phone);
-        Callmebot.whatsappMessage(u.phone, u.apikey, msg);
-        Serial.println(F("[WA] Gesendet"));
+        strlcpy(a->users[i].phone,  u.phone,  sizeof(a->users[i].phone));
+        strlcpy(a->users[i].apikey, u.apikey, sizeof(a->users[i].apikey));
+    }
+    // Core 0 = WiFi-Core; Stack 12 KB reicht für mbedTLS/HTTPS
+    BaseType_t ok = xTaskCreatePinnedToCore(
+        _whatsappTask, "waTask", 12288, a, 1, &_waTaskHandle, 0);
+    if (ok != pdPASS) {
+        Serial.println(F("[WA] Task-Fehler"));
+        delete a;
+        _waTaskHandle = NULL;
     }
 }
 
@@ -219,8 +255,8 @@ static void checkFeedComplete() {
             notifyEvent("Feeding aborted - blockage!");
             char waMsg[200];
             snprintf(waMsg, sizeof(waMsg),
-                "CatFeeder Blockade! Fuetterung (%dg) nach %d Versuch(en) "
-                "abgebrochen. Bitte Futterzufuhr pruefen. [%s]",
+                "CatFeeder Rotor blockiert! Fuetterung (%dg) nach %d Versuch(en) "
+                "abgebrochen. Bitte pruefen oder manuell nochmal starten. [%s]",
                 pendingEvent.grams, motors.blockRetries(),
                 statusData.timeStr);
             sendWhatsAppAlert(waMsg);

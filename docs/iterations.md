@@ -94,6 +94,32 @@ Verifikation:
 - `pio run` erfolgreich für `esp32dev`.
 - RAM: 16.8 %, Flash: 88.9 %.
 
+## 2026-05-07 - WhatsApp: Absturz durch blockierenden HTTPS-Aufruf behoben (1.2.1)
+
+Scope:
+
+- Firmware-Version auf `1.2.1` gesetzt.
+
+Ursache:
+- `Callmebot.whatsappMessage()` ist ein blockierender HTTPS-Aufruf (WiFiClientSecure
+  + mbedTLS). Lief direkt im Haupt-Loop → blockierte ArduinoOTA.handle() und
+  hielt Ressourcen (TCP-Verbindungen, Heap-Fragmente) nicht sauber frei.
+- Mit der Zeit: Heap-Fragmentierung durch wiederholte SSL-Sessions → ESPAsyncWebServer
+  bekommt keine Ressourcen mehr → Web-UI unerreichbar.
+
+Fix:
+- `sendWhatsAppAlert()` startet jetzt einen FreeRTOS-Task (`_whatsappTask`) auf
+  Core 0 (WiFi-Core) mit 12 KB Stack (ausreichend für mbedTLS/HTTPS).
+- Haupt-Loop (Core 1) bleibt vollständig frei während des HTTPS-Aufrufs.
+- Task kopiert alle benötigten Daten (Telefon, API-Key, Nachricht) in ein
+  heap-alloziertes Struct (`WaTaskArg`), räumt es am Ende selbst auf (`delete`).
+- Guard (`_waTaskHandle != NULL`): kein zweiter Task während noch einer läuft.
+- Bei Task-Erstellungsfehler (Heap-Mangel) wird Struct sauber freigegeben.
+
+Verifikation:
+
+- `pio run` erfolgreich für `esp32dev`.
+
 ## 2026-05-07 - Blockadeerkennung: OR-Logik, Schwellen-Default, fillLow-Spam (1.1.6)
 
 Scope:

@@ -18,6 +18,8 @@ void CfgManager::defaults(Config &c) {
 
     c.stepsPerGram = DEFAULT_STEPS_PER_GRAM;
     c.stepperSpeed = STEPPER_DEFAULT_SPEED;
+    c.stepperPulseUS = STEPPER_DEFAULT_PULSE_US;
+    c.stepperInvertDir = false;
     c.s1Open       = SERVO_DEFAULT_OPEN;
     c.s1Close      = SERVO_DEFAULT_CLOSE;
     c.s2Open       = SERVO_DEFAULT_OPEN;
@@ -40,11 +42,15 @@ void CfgManager::save(const Config &c) {
 }
 
 void CfgManager::load(Config &c) {
-    if (_p.getBytes("cfg", &c, sizeof(Config)) != sizeof(Config)) {
+    size_t cfgLen = _p.getBytesLength("cfg");
+    if (cfgLen == 0) {
         Serial.println(F("[Cfg] Keine Daten → Standardwerte"));
         defaults(c);
         save(c);
     } else {
+        defaults(c);
+        size_t readLen = cfgLen < sizeof(Config) ? cfgLen : sizeof(Config);
+        _p.getBytes("cfg", &c, readLen);
         Serial.println(F("[Cfg] Geladen"));
         bool migrated = false;
 
@@ -53,6 +59,10 @@ void CfgManager::load(Config &c) {
 
         if (c.stepperSpeed < 100 || c.stepperSpeed > 10000) {
             c.stepperSpeed = STEPPER_DEFAULT_SPEED;
+            migrated = true;
+        }
+        if (c.stepperPulseUS < 2 || c.stepperPulseUS > 50) {
+            c.stepperPulseUS = STEPPER_DEFAULT_PULSE_US;
             migrated = true;
         }
         if (c.servoSpeedDPS < 20 || c.servoSpeedDPS > 3000) {

@@ -21,6 +21,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     box-shadow:0 2px 12px rgba(0,0,0,.4)}
 .hd h1{font-size:1.2em;letter-spacing:.5px}
 .hd small{color:rgba(255,255,255,.7);font-size:.72em}
+.fw{position:absolute;right:12px;top:10px;font-weight:700}
 nav{display:flex;background:var(--c1);position:sticky;top:48px;z-index:99;
     border-bottom:1px solid rgba(255,255,255,.06);overflow-x:auto}
 nav button{flex:1;padding:10px 6px;background:none;border:none;color:var(--t2);
@@ -82,6 +83,7 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 </style></head><body>
 
 <div class="hd"><h1>&#x1F431; CatFeeder</h1>
+<small id="fw" class="fw">--</small>
 <small id="ht">--:--:--</small> &middot; <small id="hi"></small></div>
 
 <nav>
@@ -171,16 +173,17 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 
 <div class="cd"><h3>&#x2699; Stepper</h3>
 <div class="g2">
-<div><label>Steps</label><input type="number" id="ts" value="200" step="50"></div>
+<div><label>Test-Steps</label><input type="number" id="ts" value="200" min="1" max="50000" step="50"></div>
+<div><label>Geschw. (Steps/s)</label><input type="number" id="cs" value="1200" min="100" max="10000" step="100"></div>
+<div><label>STEP-Puls (µs)</label><input type="number" id="spu" value="5" min="2" max="50" step="1"></div>
+<div><label>Richtung invertieren</label><select id="sdi"><option value="0">Nein</option><option value="1">Ja</option></select></div>
 <div style="display:flex;align-items:flex-end;gap:4px">
 <button class="bt b2 bs" onclick="tst(1)">&#x25B6; Vor</button>
 <button class="bt b2 bs" onclick="tst(-1)">&#x25C0; Zurück</button></div></div></div>
 
 <div class="cd"><h3>&#x2696; Futter</h3>
 <label>Steps pro Gramm</label>
-<input type="number" id="cg" value="10" min="1" max="200">
-<label>Stepper-Geschw. (Steps/s)</label>
-<input type="number" id="cs" value="1200" min="100" max="10000" step="100"></div>
+<input type="number" id="cg" value="10" min="1" max="200"></div>
 
 <div class="cd"><h3>&#x1F4CF; Füllstand</h3>
 <label>Abstand "Leer" (mm)</label><input type="number" id="ce" value="300" min="50" max="600">
@@ -256,7 +259,9 @@ async function lc(){
         <option value="0"${s.sv==0?' selected':''}>Beide</option>
         <option value="1"${s.sv==1?' selected':''}>S1</option>
         <option value="2"${s.sv==2?' selected':''}>S2</option></select></div>`;}
+  $('fw').textContent=C.fw||'--';
   $('cg').value=C.spg; $('cs').value=C.spd;
+  $('spu').value=C.spu||5; $('sdi').value=C.sdi?1:0;
   $('ss').value=C.svs||1000;
   $('ce').value=C.feM; $('cf').value=C.ffM;
   $('r1').value=C.s1o; $('r1v').textContent=C.s1o+'°';
@@ -270,6 +275,7 @@ function ut(i,v){const p=v.split(':');C.slots[i].h=+p[0];C.slots[i].m=+p[1];}
 // ── Config speichern ──
 async function sav(){
   C.spg=+$('cg').value; C.spd=+$('cs').value;
+  C.spu=+$('spu').value; C.sdi=$('sdi').value==='1';
   C.svs=+$('ss').value;
   C.feM=+$('ce').value; C.ffM=+$('cf').value;
   C.tz=+$('tz').value;  C.dst=$('ds').checked;
@@ -298,6 +304,7 @@ function sse(){
   const es=new EventSource('/events');
   es.addEventListener('s',e=>{
     const d=JSON.parse(e.data);
+    if(d.fw)$('fw').textContent=d.fw;
     $('ht').textContent=d.t||'--:--:--';
     $('fp').textContent=d.fl+'%'; $('fm').textContent=d.mm+' mm';
     $('fb').style.width=d.fl+'%';

@@ -6,8 +6,8 @@
 #include <Preferences.h>
 
 // ─── Firmware ───────────────────────────────────────────────────────────────
-#define FW_VERSION             "1.0.3"
-#define CONFIG_SCHEMA_VERSION  2
+#define FW_VERSION             "1.0.4"
+#define CONFIG_SCHEMA_VERSION  3
 
 // ─── WLAN ───────────────────────────────────────────────────────────────────
 #define WIFI_AP_SSID           "CatFeeder-Setup"
@@ -29,7 +29,8 @@
 // ─── Stepper ────────────────────────────────────────────────────────────────
 #define STEPPER_STEPS_REV      200     // NEMA17 Standard (1,8° / Schritt)
 #define STEPPER_DEFAULT_SPEED  1200    // Steps/s
-#define STEPPER_PULSE_US       5       // Mindest-Pulsdauer µs
+#define STEPPER_DEFAULT_PULSE_US 5     // Mindest-Pulsdauer µs
+#define STEPPER_PULSE_US       STEPPER_DEFAULT_PULSE_US
 
 // ─── Servo ──────────────────────────────────────────────────────────────────
 #define SERVO_MIN_US           500
@@ -91,6 +92,10 @@ struct Config {
     int8_t   utcOffset;      // Stunden
     bool     dst;            // Sommerzeit
     char     hostname[33];
+
+    // Stepper-Feinabstimmung
+    uint16_t stepperPulseUS; // STEP High-Zeit in µs
+    bool     stepperInvertDir;
 };
 
 struct Status {

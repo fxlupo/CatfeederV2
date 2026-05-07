@@ -56,6 +56,7 @@ void Web::_wifi() {
 void Web::_sendSSE() {
     if (_sse.count() == 0) return;
     JsonDocument d;
+    d["fw"]  = FW_VERSION;
     d["v"]   = _st->busV;
     d["ma"]  = _st->currentMA;
     d["mw"]  = _st->powerMW;
@@ -135,6 +136,7 @@ void Web::_routes() {
     // GET Config
     _srv.on("/api/config", HTTP_GET, [this](AsyncWebServerRequest *r) {
         JsonDocument d;
+        d["fw"]=FW_VERSION;
         JsonArray sl = d["slots"].to<JsonArray>();
         for (int i = 0; i < MAX_SLOTS; i++) {
             JsonObject o = sl.add<JsonObject>();
@@ -145,6 +147,7 @@ void Web::_routes() {
             o["sv"] = _c->slots[i].servo;
         }
         d["spg"]=_c->stepsPerGram; d["spd"]=_c->stepperSpeed;
+        d["spu"]=_c->stepperPulseUS; d["sdi"]=_c->stepperInvertDir;
         d["s1o"]=_c->s1Open; d["s1c"]=_c->s1Close;
         d["s2o"]=_c->s2Open; d["s2c"]=_c->s2Close;
         d["svs"]=_c->servoSpeedDPS;
@@ -174,6 +177,8 @@ void Web::_routes() {
         }
         if (!doc["spg"].isNull()) _c->stepsPerGram = doc["spg"];
         if (!doc["spd"].isNull()) _c->stepperSpeed = constrain((uint16_t)doc["spd"], 100, 10000);
+        if (!doc["spu"].isNull()) _c->stepperPulseUS = constrain((uint16_t)doc["spu"], 2, 50);
+        if (!doc["sdi"].isNull()) _c->stepperInvertDir = doc["sdi"];
         if (!doc["s1o"].isNull()) _c->s1Open   = doc["s1o"];
         if (!doc["s1c"].isNull()) _c->s1Close  = doc["s1c"];
         if (!doc["s2o"].isNull()) _c->s2Open   = doc["s2o"];
@@ -221,7 +226,7 @@ void Web::_routes() {
     _srv.on("/api/stp", HTTP_POST, bodyHandler, NULL,
         [this](AsyncWebServerRequest *r, uint8_t *d, size_t l, size_t, size_t) {
         JsonDocument doc; deserializeJson(doc, d, l);
-        _mo->setSpeed(_c->stepperSpeed);
+        _mo->configureStepper(*_c);
         _mo->run(doc["s"]|100);
         r->send(200, "application/json", "{\"ok\":1}");
     });

@@ -15,6 +15,7 @@ public:
 
     // ── Stepper ─────────────────────────────────────────────────────────────
     void drvEnable(bool on);
+    void configureStepper(const Config &c);
     void setSpeed(uint16_t stepsPerSec);
     void run(int32_t steps);                  // +vorwärts, −rückwärts
     void stop();
@@ -43,6 +44,8 @@ private:
     int8_t   _dir     = 1;
     uint32_t _ivlUS   = 1666;     // µs zwischen Steps
     uint32_t _lastUS  = 0;
+    uint16_t _pulseUS = STEPPER_DEFAULT_PULSE_US;
+    bool     _dirInvert = false;
     bool     _enabled = false;
     int16_t  _sv1Pos  = -1;
     int16_t  _sv2Pos  = -1;

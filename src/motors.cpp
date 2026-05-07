@@ -11,7 +11,7 @@ void Motors::begin(const Config &c) {
     digitalWrite(PIN_DIR,  LOW);
     drvEnable(false);
 
-    setSpeed(c.stepperSpeed);
+    configureStepper(c);
 
     ESP32PWM::allocateTimer(0);
     ESP32PWM::allocateTimer(1);
@@ -28,11 +28,17 @@ void Motors::drvEnable(bool on) {
     digitalWrite(PIN_EN_DRV, on ? LOW : HIGH);
 }
 
+void Motors::configureStepper(const Config &c) {
+    _pulseUS = constrain(c.stepperPulseUS, 2, 50);
+    _dirInvert = c.stepperInvertDir;
+    setSpeed(c.stepperSpeed);
+}
+
 void Motors::setSpeed(uint16_t sps) {
     if (sps < 1) sps = 1;
     _ivlUS = 1000000UL / sps;
-    if (_ivlUS < STEPPER_PULSE_US * 2)
-        _ivlUS = STEPPER_PULSE_US * 2;
+    if (_ivlUS < _pulseUS * 2)
+        _ivlUS = _pulseUS * 2;
 }
 
 void Motors::run(int32_t steps) {
@@ -40,7 +46,9 @@ void Motors::run(int32_t steps) {
     drvEnable(true);
     _dir = (steps > 0) ? 1 : -1;
     _remain = abs(steps);
-    digitalWrite(PIN_DIR, (steps > 0) ? HIGH : LOW);
+    bool dirLevel = steps > 0;
+    if (_dirInvert) dirLevel = !dirLevel;
+    digitalWrite(PIN_DIR, dirLevel ? HIGH : LOW);
     _lastUS = micros();
     Serial.printf("[Step] %d Steps %s\n", _remain, _dir > 0 ? "→" : "←");
 }
@@ -52,7 +60,7 @@ void Motors::stop() {
 
 void Motors::_pulse() {
     digitalWrite(PIN_STEP, HIGH);
-    delayMicroseconds(STEPPER_PULSE_US);
+    delayMicroseconds(_pulseUS);
     digitalWrite(PIN_STEP, LOW);
     _pos += _dir;
 }
@@ -88,7 +96,7 @@ void Motors::dispense(uint16_t grams, uint8_t servo, const Config &c) {
     delay(600);
 
     // 2. Stepper fördern
-    setSpeed(c.stepperSpeed);
+    configureStepper(c);
     int32_t steps = (int32_t)grams * c.stepsPerGram;
     run(steps);
 

@@ -165,3 +165,25 @@ Verifikation:
 
 - `pio run` erfolgreich fuer `esp32dev`.
 - `pio run -e esp32dev_ota` erfolgreich.
+
+## 2026-05-07 - Stepper-Kalibrierung erweitert
+
+Scope:
+
+- Firmware-Version auf `1.0.4` gesetzt.
+- Stepper-Parameter in der WebUI erweitert:
+  - Test-Steps
+  - Grundgeschwindigkeit in Steps/s
+  - STEP-Pulsbreite in us
+  - Richtungsinvertierung
+  - Steps pro Gramm
+- Firmware nutzt die gespeicherten Stepper-Parameter fuer Testfahrten und
+  Fuetterungsfahrten.
+- Header der WebUI zeigt jetzt die laufende Firmware-Version oben rechts an.
+- Config-Ladung toleriert kleinere gespeicherte Config-Bloecke und ergaenzt
+  neue Felder mit Defaults, damit OTA-Updates weniger Kalibrierwerte verlieren.
+
+Verifikation:
+
+- `pio run` erfolgreich fuer `esp32dev`.
+- `pio run -e esp32dev_ota` erfolgreich.

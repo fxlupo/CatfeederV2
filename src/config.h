@@ -123,7 +123,16 @@ struct Status {
 
     // System
     bool     wifiOK;
+    bool     apMode;
+    bool     otaReady;
+    uint16_t otaPort;
+    int32_t  wifiRSSI;
     char     timeStr[20];    // "HH:MM:SS DD.MM.YYYY"
+    char     ip[16];         // "255.255.255.255"
+    char     hostname[33];
+    char     wifiMode[5];    // "STA" / "AP"
+    char     otaPhase[16];
+    char     lastOtaError[24];
     uint32_t uptimeS;
     uint32_t heap;
     uint32_t feeds;          // Gesamtfütterungen

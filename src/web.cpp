@@ -21,6 +21,10 @@ void Web::loop() {
     if (millis() - _lastSSE > 2000) { _sendSSE(); _lastSSE = millis(); }
 }
 
+String Web::ip() {
+    return _ap ? WiFi.softAPIP().toString() : WiFi.localIP().toString();
+}
+
 // ═══════════════════════ WiFi ═══════════════════════════════════════════════
 
 void Web::_wifi() {
@@ -62,6 +66,14 @@ void Web::_sendSSE() {
     d["up"]  = _st->uptimeS;
     d["hp"]  = _st->heap;
     d["fc"]  = _st->feeds;
+    d["ip"]  = _st->ip;
+    d["hn"]  = _st->hostname;
+    d["wm"]  = _st->wifiMode;
+    d["wr"]  = _st->wifiRSSI;
+    d["ot"]  = _st->otaReady;
+    d["op"]  = _st->otaPort;
+    d["oph"] = _st->otaPhase;
+    d["oe"]  = _st->lastOtaError;
 
     JsonObject ir = d["ir"].to<JsonObject>();
     ir["a1"] = _st->ir1Analog;  ir["a2"] = _st->ir2Analog;
@@ -95,7 +107,32 @@ void Web::_routes() {
         d["mm"]=_st->distMM; d["fl"]=_st->fillPct; d["ang"]=_st->angleDeg;
         d["t"]=_st->timeStr; d["up"]=_st->uptimeS; d["hp"]=_st->heap;
         d["fc"]=_st->feeds; d["fw"]=FW_VERSION;
+        d["wifi"]=_st->wifiOK; d["ap"]=_st->apMode; d["ip"]=_st->ip;
+        d["hostname"]=_st->hostname; d["wifiMode"]=_st->wifiMode;
+        d["rssi"]=_st->wifiRSSI; d["otaReady"]=_st->otaReady;
+        d["otaPort"]=_st->otaPort; d["otaPhase"]=_st->otaPhase;
+        d["lastOtaError"]=_st->lastOtaError;
         String j; serializeJson(d, j);
+        r->send(200, "application/json", j);
+    });
+
+    // GET Diagnostics
+    _srv.on("/api/diag", HTTP_GET, [this](AsyncWebServerRequest *r) {
+        JsonDocument d;
+        d["fw"] = FW_VERSION;
+        d["ip"] = _st->ip;
+        d["hostname"] = _st->hostname;
+        d["wifiMode"] = _st->wifiMode;
+        d["wifiOK"] = _st->wifiOK;
+        d["apMode"] = _st->apMode;
+        d["rssi"] = _st->wifiRSSI;
+        d["otaReady"] = _st->otaReady;
+        d["otaPort"] = _st->otaPort;
+        d["otaPhase"] = _st->otaPhase;
+        d["lastOtaError"] = _st->lastOtaError;
+        d["uptimeS"] = _st->uptimeS;
+        d["heap"] = _st->heap;
+        String j; serializeJsonPretty(d, j);
         r->send(200, "application/json", j);
     });
 

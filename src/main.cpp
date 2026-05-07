@@ -19,6 +19,16 @@ Web web;
 static uint8_t lastMinute = 255;
 static bool dayResetDone = false;
 static bool feedInProgress = false;
+static bool otaReady = false;
+static const uint16_t OTA_PORT = 3232;
+
+static void setOtaPhase(const char *phase) {
+    strlcpy(statusData.otaPhase, phase, sizeof(statusData.otaPhase));
+}
+
+static void setOtaError(const char *error) {
+    strlcpy(statusData.lastOtaError, error, sizeof(statusData.lastOtaError));
+}
 
 static void notifyEvent(const __FlashStringHelper *event) {
     Serial.print(F("[Notify] "));
@@ -32,21 +42,40 @@ static void notifyEvent(const char *event) {
 
 static void beginOTA() {
     ArduinoOTA.setHostname(cfg.hostname);
+    ArduinoOTA.setPort(OTA_PORT);
 
     ArduinoOTA.onStart([]() {
+        setOtaPhase("start");
         notifyEvent(F("OTA start"));
         motors.stop();
         motors.detachServos();
     });
     ArduinoOTA.onEnd([]() {
+        setOtaPhase("complete");
         notifyEvent(F("OTA complete"));
     });
+    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+        uint8_t pct = total > 0 ? (progress * 100U / total) : 0;
+        Serial.printf("[OTA] progress=%u%%\n", pct);
+    });
     ArduinoOTA.onError([](ota_error_t error) {
+        setOtaPhase("error");
+        switch (error) {
+            case OTA_AUTH_ERROR: setOtaError("auth"); break;
+            case OTA_BEGIN_ERROR: setOtaError("begin"); break;
+            case OTA_CONNECT_ERROR: setOtaError("connect"); break;
+            case OTA_RECEIVE_ERROR: setOtaError("receive"); break;
+            case OTA_END_ERROR: setOtaError("end"); break;
+            default: setOtaError("unknown"); break;
+        }
         Serial.printf("[OTA] error=%u\n", error);
     });
 
+    setOtaPhase("ready");
+    setOtaError("");
     ArduinoOTA.begin();
-    Serial.printf("[OTA] Ready as %s.local\n", cfg.hostname);
+    otaReady = true;
+    Serial.printf("[OTA] Ready as %s.local:%u\n", cfg.hostname, OTA_PORT);
 }
 
 static void refreshStatus() {
@@ -54,6 +83,13 @@ static void refreshStatus() {
     sensors.fillStatus(statusData, cfg);
     statusData.feeds = cfgMgr.loadFeedCount();
     statusData.wifiOK = !web.apMode();
+    statusData.apMode = web.apMode();
+    statusData.otaReady = otaReady;
+    statusData.otaPort = OTA_PORT;
+    statusData.wifiRSSI = WiFi.isConnected() ? WiFi.RSSI() : 0;
+    strlcpy(statusData.ip, web.ip().c_str(), sizeof(statusData.ip));
+    strlcpy(statusData.hostname, cfg.hostname, sizeof(statusData.hostname));
+    strlcpy(statusData.wifiMode, web.apMode() ? "AP" : "STA", sizeof(statusData.wifiMode));
 
     if (statusData.overcurrent) notifyEvent(F("Overcurrent detected"));
     if (statusData.fillLow) notifyEvent(F("Fill level low"));
@@ -122,6 +158,8 @@ void setup() {
     delay(300);
     Serial.println();
     Serial.printf("CatFeeder firmware %s\n", FW_VERSION);
+    setOtaPhase("boot");
+    setOtaError("");
 
     cfgMgr.begin();
     cfgMgr.load(cfg);

@@ -15,6 +15,7 @@ public:
     void begin(Config &c, Status &st, Sensors &se, Motors &mo, CfgManager &cm);
     void loop();
     bool apMode() { return _ap; }
+    String ip();
 
     // Flag: Asynchrone Fütterung angefordert
     bool     feedRequested = false;

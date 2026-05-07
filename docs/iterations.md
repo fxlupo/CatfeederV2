@@ -45,3 +45,30 @@ Verifikation:
 - USB-Upload versucht, aber `/dev/cu.wchusbserial110` war auf dem Mac nicht
   vorhanden. Sichtbare Ports: `/dev/cu.Bluetooth-Incoming-Port`,
   `/dev/cu.debug-console`.
+
+## 2026-05-07 - OTA-Diagnose erweitert
+
+Scope:
+
+- Eigenes PlatformIO-Environment `esp32dev_ota` fuer OTA-Uploads angelegt.
+- OTA-Port explizit auf `3232` gesetzt.
+- OTA-Callbacks um Phase, Fortschritt und Fehlertext erweitert.
+- `/api/status` um WLAN- und OTA-Diagnosefelder erweitert.
+- `/api/diag` als lesbaren Diagnose-Endpunkt ergaenzt.
+- SSE-Liveupdates transportieren ebenfalls IP, Hostname, WLAN-Modus und
+  OTA-Status.
+
+Neue Diagnosefelder:
+
+- `ip`
+- `hostname`
+- `wifiMode`
+- `rssi`
+- `otaReady`
+- `otaPort`
+- `otaPhase`
+- `lastOtaError`
+
+Verifikation:
+
+- `pio run` erfolgreich fuer `esp32dev` und `esp32dev_ota`.

@@ -88,6 +88,9 @@ bool Motors::moveBlocking(int32_t steps, const Config &c) {
     float prevAngle   = -1.0f;
     uint8_t blockConsec = 0;
     bool  blocked     = false;
+    // Kalibrierungsdaten
+    float peakCurMA   = 0.0f;
+    float minDeltaDeg = 9999.0f;
 
     for (uint32_t i = 0; i < count; i++) {
         digitalWrite(PIN_STEP, HIGH);
@@ -112,6 +115,8 @@ bool Motors::moveBlocking(int32_t steps, const Config &c) {
                 float curMA = 0.0f, angle = 0.0f;
                 _sensors->readInstant(curMA, angle);
 
+                if (curMA > peakCurMA) peakCurMA = curMA;
+
                 bool curHigh = (curMA > (float)_blockMA);
 
                 bool rotLow = false;
@@ -119,14 +124,16 @@ bool Motors::moveBlocking(int32_t steps, const Config &c) {
                     float delta = angle - prevAngle;
                     if (delta >  180.0f) delta -= 360.0f;
                     if (delta < -180.0f) delta += 360.0f;
-                    rotLow = (fabsf(delta) < _blockMinAngle);
+                    float absDelta = fabsf(delta);
+                    if (absDelta < minDeltaDeg) minDeltaDeg = absDelta;
+                    rotLow = (absDelta < _blockMinAngle);
                 }
                 prevAngle = angle;
 
                 if (curHigh && rotLow) {
                     if (++blockConsec >= 2) {
-                        Serial.printf("[Block] Strom=%.0fmA Rot<%.1f° → Blockade!\n",
-                                      curMA, _blockMinAngle);
+                        Serial.printf("[Block] Strom=%.0fmA Rot=%.1f° → Blockade!\n",
+                                      curMA, minDeltaDeg);
                         blocked = true;
                         break;
                     }
@@ -140,6 +147,13 @@ bool Motors::moveBlocking(int32_t steps, const Config &c) {
     if (_holdMS > 0 && !blocked) delay(_holdMS);
     drvEnable(false);
     _remain = 0;
+    if (_blockDetect) {
+        Serial.printf("[Block] Kalibrierung: Peak-Strom=%.0f mA (Schwelle=%u mA)  "
+                      "Min-Rotation=%.1f° (Schwelle=%.1f°)\n",
+                      peakCurMA, _blockMA,
+                      minDeltaDeg < 9999.0f ? minDeltaDeg : 0.0f,
+                      _blockMinAngle);
+    }
     if (!blocked) Serial.printf("[Step] Fertig @ pos %d\n", _pos);
     return !blocked;
 }

@@ -56,6 +56,24 @@ Verifikation:
 - `pio run` erfolgreich für `esp32dev`.
 - RAM: 16.2 %, Flash: 77.3 %.
 
+## 2026-05-07 - Blockadeerkennung: Kalibrier-Logging (1.1.5)
+
+Scope:
+
+- Firmware-Version auf `1.1.5` gesetzt.
+- Nach jeder Fütterung (Stepper-Phase mit aktiver Blockadeerkennung) wird
+  eine Kalibrier-Zeile auf Serial ausgegeben:
+  ```
+  [Block] Kalibrierung: Peak-Strom=XXX mA (Schwelle=YYYY mA)  Min-Rotation=ZZ.Z° (Schwelle=34.6°)
+  ```
+- Gibt dem Anwender die gemessenen Ist-Werte für Peak-Strom und minimales
+  Winkeldelta, um `stepperBlockMA` und `blockMinRotPct` gezielt einstellen zu können.
+- Kein Logging bei Selbsttest oder Web-Testfahrt (nur wenn `_blockDetect` aktiv).
+
+Verifikation:
+
+- `pio run` erfolgreich für `esp32dev`.
+
 ## 2026-05-07 - OTA-Stabilität: drei Ursachen behoben (1.1.3)
 
 Scope:

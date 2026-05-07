@@ -167,6 +167,7 @@ void setup() {
 
     sensors.begin();
     motors.begin(cfg);
+    motors.selfTest(cfg);
     refreshStatus();
 
     web.begin(cfg, statusData, sensors, motors, cfgMgr);

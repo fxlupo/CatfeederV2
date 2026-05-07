@@ -7,7 +7,7 @@ Scheduler, Sensor-Monitoring und vorbereiteten Benachrichtigungs-Hooks.
 
 - Zielplattform: ESP32
 - Buildsystem: PlatformIO / Arduino Framework
-- Firmware-Version: `1.0.0`
+- Firmware-Version: `1.0.7`
 - Web UI: lokal ueber HTTP, im Setup-Fall als Access Point
 - OTA: ArduinoOTA ueber WLAN/mDNS vorbereitet
 - Scheduler: bis zu 8 taegliche Fuetterungszeiten
@@ -75,6 +75,28 @@ Tabs:
 - Zeiten: bis zu 8 taegliche Fuetterungszeiten
 - Kalibrierung: Servo-Winkel, Servo-Geschwindigkeit, Stepper-Test, Steps pro Gramm, Fuellstandsgrenzen
 - Einstellungen: WLAN, RTC-Sync, Zeitzone, Hostname, Werksreset
+
+## Selbsttest beim Start
+
+Beim Einschalten führt die Firmware automatisch einen Selbsttest durch:
+
+1. **Stepper** – 50 Schritte vorwärts, dann 50 Schritte zurück (prüft Treiber und Verkabelung)
+2. **Servo 1** – Offen-Position anfahren, dann Zu-Position
+3. **Servo 2** – Offen-Position anfahren, dann Zu-Position
+
+Der Test nutzt die gespeicherten Kalibrierwerte (Winkel, Geschwindigkeit, Schritte).
+Schlägt ein Servo oder der Stepper nicht an, ist dies am seriellen Monitor erkennbar.
+
+## Fütterungsablauf
+
+Jede Fütterung (manuell oder per Zeitplan) folgt diesem Ablauf:
+
+1. Klappe(n) öffnen – Servos fahren auf die konfigurierte Offen-Position
+2. Stepper läuft – fördert die eingestellte Menge (Gramm × Steps/g)
+3. Klappe(n) schließen – Servos fahren auf die Zu-Position
+4. 1 Sekunde warten – Futter setzt sich
+5. Nachklappen – Servos einmal kurz auf/zu zum Abklopfen von Futterresten
+6. Servos werden abgeschaltet (kein Haltestrom)
 
 ## REST API
 

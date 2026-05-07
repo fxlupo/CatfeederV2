@@ -54,6 +54,36 @@ Aktuelle Ereignisse:
 Spaetere Benachrichtigungskanaele koennen an `notifyEvent()` angebunden werden,
 z. B. MQTT, Telegram, Webhook oder Push-Service.
 
+## Selbsttest
+
+Beim Start ruft `setup()` `Motors::selfTest()` auf:
+
+1. Stepper 50 Schritte vor, 200 ms Pause, 50 Schritte zurück
+2. Servo 1 öffnen → Servo 1 schließen
+3. Servo 2 öffnen → Servo 2 schließen
+
+Der Test nutzt die gespeicherten Kalibrierwerte und gibt Ergebnis auf Serial aus.
+
+## Fütterungsablauf
+
+`Motors::dispense(grams, servo, cfg)` führt folgende Schritte aus:
+
+1. Servos öffnen (600 ms Wartezeit)
+2. Stepper blockierend laufen lassen (`grams × stepsPerGram` Schritte)
+3. 400 ms Pause
+4. Servos schließen
+5. 1000 ms Pause (Futter setzt sich)
+6. Servos erneut öffnen (500 ms)
+7. Servos schließen (400 ms) – Nachklappen zum Abklopfen von Futterresten
+8. Servos detachen (kein Haltestrom)
+
+## Blockierschutz
+
+`Config::stepperBlockMA` speichert den Strom-Schwellwert (mA), ab dem der Stepper als
+blockiert gilt. Der Wert ist über die Web-UI und die REST-API (`sbm`) konfigurierbar.
+Die aktive Auswertung erfolgt in der späteren nicht-blockierenden State-Machine;
+der Konfigwert ist bereits vorhanden und wird im NVS gespeichert.
+
 ## Bekannte technische Punkte
 
 - `Motors::dispense()` ist noch blockierend. Das ist fuer den ersten sauberen

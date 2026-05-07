@@ -32,8 +32,13 @@ public:
     void setAngle(uint8_t num, uint8_t deg);  // 1 oder 2
     void detachServos();
 
+    // ── Selbsttest beim Start ───────────────────────────────────────────────
+    // Stepper 50 vor / 50 zurück, dann Servo 1 und 2 auf/zu
+    void selfTest(const Config &c);
+
     // ── Fütterung (blockierend) ─────────────────────────────────────────────
     // Gibt `grams` Gramm aus. `servo`: 0=beide, 1=S1, 2=S2
+    // Ablauf: Servos auf → Stepper → Servos zu → 1s warten → Servos auf/zu
     void dispense(uint16_t grams, uint8_t servo, const Config &c);
 
 private:

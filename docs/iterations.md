@@ -1,5 +1,37 @@
 # Iterationen
 
+## 2026-05-07 - Selbsttest, Fütterungsablauf und Blockierstrom-Konfiguration
+
+Scope:
+
+- Firmware-Version auf `1.0.7` gesetzt.
+- `Motors::selfTest()` eingeführt: Stepper 50 Schritte vor/zurück, danach
+  Servo 1 und Servo 2 jeweils einmal auf/zu. Wird einmalig in `setup()` aufgerufen.
+- Fütterungsablauf in `Motors::dispense()` präzisiert:
+  1. Servos öffnen (600 ms)
+  2. Stepper laufen (Gramm × Steps/g)
+  3. Servos schließen
+  4. 1 Sekunde warten
+  5. Nachklappen: Servos einmal auf/zu zum Abklopfen von Futterresten
+  6. Servos detachen
+- `Config::stepperBlockMA` (Strom-Schwellwert für Stall-Erkennung) als neues
+  Konfigurationsfeld eingeführt. Default: 1500 mA.
+- Schema-Version auf 5 gesetzt; Migration setzt fehlende Felder auf Defaults.
+- Web-UI: neues Eingabefeld „Blockierstrom (mA)" im Stepper-Abschnitt.
+- REST-API: `sbm`-Schlüssel in GET/POST `/api/config` ergänzt.
+- README und Architektur-Dokumentation um Selbsttest und Fütterungsablauf erweitert.
+
+Hinweis:
+- `stepperBlockMA` ist konfigurierbar und wird im NVS gespeichert.
+  Die aktive Auswertung (Stall-Stop) folgt mit der nicht-blockierenden State-Machine.
+
+Verifikation:
+
+- `pio run` erfolgreich für `esp32dev`.
+- `pio run -e esp32dev_ota` erfolgreich.
+
+
+
 ## 2026-05-07 - Struktur bereinigt und Firmware-Orchestrierung hergestellt
 
 Scope:

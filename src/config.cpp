@@ -30,6 +30,7 @@ void CfgManager::defaults(Config &c) {
     c.fillEmptyMM  = FILL_EMPTY_MM;
     c.fillFullMM   = FILL_FULL_MM;
     c.irThreshold  = IR_THRESHOLD;
+    c.stepperBlockMA = STEPPER_DEFAULT_BLOCK_MA;
     c.utcOffset    = 1;          // MEZ
     c.dst          = true;
     strlcpy(c.ssid, WIFI_DEFAULT_SSID, sizeof(c.ssid));
@@ -77,6 +78,10 @@ void CfgManager::load(Config &c) {
         }
         if (c.servoSpeedDPS < 20 || c.servoSpeedDPS > 3000) {
             c.servoSpeedDPS = SERVO_DEFAULT_SPEED_DPS;
+            migrated = true;
+        }
+        if (c.stepperBlockMA < 100 || c.stepperBlockMA > 5000) {
+            c.stepperBlockMA = STEPPER_DEFAULT_BLOCK_MA;
             migrated = true;
         }
 

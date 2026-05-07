@@ -130,6 +130,33 @@ void Motors::loop() {
     }
 }
 
+// ═══════════════════════ Selbsttest ═════════════════════════════════════════
+
+void Motors::selfTest(const Config &c) {
+    Serial.println(F("[SelfTest] Start"));
+
+    // Stepper: 50 Schritte vor, 50 zurück
+    moveBlocking(50, c);
+    delay(200);
+    moveBlocking(-50, c);
+    delay(300);
+
+    // Servo 1: auf → zu
+    s1Open(c);
+    delay(600);
+    s1Close(c);
+    delay(400);
+
+    // Servo 2: auf → zu
+    s2Open(c);
+    delay(600);
+    s2Close(c);
+    delay(400);
+
+    detachServos();
+    Serial.println(F("[SelfTest] OK"));
+}
+
 // ═══════════════════════ Fütterung ══════════════════════════════════════════
 
 void Motors::dispense(uint16_t grams, uint8_t servo, const Config &c) {
@@ -143,13 +170,20 @@ void Motors::dispense(uint16_t grams, uint8_t servo, const Config &c) {
     // 2. Stepper fördern
     int32_t steps = (int32_t)grams * c.stepsPerGram;
     moveBlocking(steps, c);
-
     delay(400);
 
     // 3. Klappen schließen
     if (servo == 0 || servo == 1) s1Close(c);
     if (servo == 0 || servo == 2) s2Close(c);
-    delay(600);
+    delay(1000);
+
+    // 4. Nachklappen: einmal auf/zu zum Abklopfen von Futterresten
+    if (servo == 0 || servo == 1) s1Open(c);
+    if (servo == 0 || servo == 2) s2Open(c);
+    delay(500);
+    if (servo == 0 || servo == 1) s1Close(c);
+    if (servo == 0 || servo == 2) s2Close(c);
+    delay(400);
 
     detachServos();
     Serial.println(F("[Feed] Fertig"));

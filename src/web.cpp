@@ -149,6 +149,7 @@ void Web::_routes() {
         d["spg"]=_c->stepsPerGram; d["spd"]=_c->stepperSpeed;
         d["spu"]=_c->stepperPulseUS; d["sdi"]=_c->stepperInvertDir;
         d["sds"]=_c->stepperDirSetupUS; d["shm"]=_c->stepperHoldMS;
+        d["sbm"]=_c->stepperBlockMA;
         d["s1o"]=_c->s1Open; d["s1c"]=_c->s1Close;
         d["s2o"]=_c->s2Open; d["s2c"]=_c->s2Close;
         d["svs"]=_c->servoSpeedDPS;
@@ -182,6 +183,7 @@ void Web::_routes() {
         if (!doc["sdi"].isNull()) _c->stepperInvertDir = doc["sdi"];
         if (!doc["sds"].isNull()) _c->stepperDirSetupUS = constrain((uint16_t)doc["sds"], 0, 2000);
         if (!doc["shm"].isNull()) _c->stepperHoldMS = constrain((uint16_t)doc["shm"], 0, 5000);
+        if (!doc["sbm"].isNull()) _c->stepperBlockMA = constrain((uint16_t)doc["sbm"], 100, 5000);
         if (!doc["s1o"].isNull()) _c->s1Open   = doc["s1o"];
         if (!doc["s1c"].isNull()) _c->s1Close  = doc["s1c"];
         if (!doc["s2o"].isNull()) _c->s2Open   = doc["s2o"];

@@ -6,8 +6,8 @@
 #include <Preferences.h>
 
 // ─── Firmware ───────────────────────────────────────────────────────────────
-#define FW_VERSION             "1.0.6"
-#define CONFIG_SCHEMA_VERSION  4
+#define FW_VERSION             "1.0.7"
+#define CONFIG_SCHEMA_VERSION  5
 
 // ─── WLAN ───────────────────────────────────────────────────────────────────
 #define WIFI_AP_SSID           "CatFeeder-Setup"
@@ -46,6 +46,7 @@
 #define FILL_FULL_MM           30      // VL53L0X Abstand = Behälter voll
 #define IR_THRESHOLD           2048    // Analog-Schwelle IR
 #define INA_OVERCURRENT_MA     2000    // Überstrom-Grenze mA
+#define STEPPER_DEFAULT_BLOCK_MA 1500  // Blockierstrom-Schwelle mA (Stepper-Stall)
 
 // ─── Fütterung ──────────────────────────────────────────────────────────────
 #define MAX_SLOTS              8       // Fütterungszeiten pro Tag
@@ -100,6 +101,9 @@ struct Config {
     bool     stepperInvertDir;
     uint16_t stepperDirSetupUS;
     uint16_t stepperHoldMS;
+
+    // Blockierschutz
+    uint16_t stepperBlockMA; // Strom-Schwelle für Stall-Erkennung (mA)
 };
 
 struct Status {

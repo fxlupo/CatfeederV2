@@ -244,6 +244,11 @@ void Motors::_svClose() {
     if (_dispServo == 0 || _dispServo == 2) s2Close(*_dispCfg);
 }
 
+void Motors::_svCloseAll() {
+    s1Close(*_dispCfg);
+    s2Close(*_dispCfg);
+}
+
 void Motors::_dispenseLoop() {
     switch (_dispState) {
 
@@ -279,18 +284,18 @@ void Motors::_dispenseLoop() {
             break;
 
         case DS_SERVO_CLOSE:
-            if (_dispNew) { _svClose(); _dispTimer = millis(); _dispNew = false; }
+            if (_dispNew) { _svCloseAll(); _dispTimer = millis(); _dispNew = false; }
             if (millis() - _dispTimer >= 1000) _dispNext(DS_SHAKE_OPEN);
             break;
 
         case DS_SHAKE_OPEN:
             if (_dispNew) { _svOpen(); _dispTimer = millis(); _dispNew = false; }
-            if (millis() - _dispTimer >= 500) _dispNext(DS_SHAKE_CLOSE);
+            if (millis() - _dispTimer >= 500) _dispNext(DS_FINAL_CLOSE);
             break;
 
-        case DS_SHAKE_CLOSE:
-            if (_dispNew) { _svClose(); _dispTimer = millis(); _dispNew = false; }
-            if (millis() - _dispTimer >= 400) _dispNext(DS_DONE);
+        case DS_FINAL_CLOSE:
+            if (_dispNew) { _svCloseAll(); _dispTimer = millis(); _dispNew = false; }
+            if (millis() - _dispTimer >= 1000) _dispNext(DS_DONE);
             break;
 
         case DS_DONE:
@@ -320,7 +325,7 @@ void Motors::_dispenseLoop() {
                 _dispRetries++;
                 if (_dispRetries > _dispCfg->blockRetries) {
                     _feedAborted = true;
-                    _dispNext(DS_DONE);
+                    _dispNext(DS_FINAL_CLOSE);
                 } else {
                     Serial.printf("[Feed] Wiederholung %u/%u\n",
                                   _dispRetries, _dispCfg->blockRetries + 1);

@@ -17,7 +17,7 @@ enum DispState : uint8_t {
     DS_STEPPER_WAIT,     // 400 ms Pause nach Stepper
     DS_SERVO_CLOSE,      // Servos schließen, 1000 ms warten
     DS_SHAKE_OPEN,       // Nachklappen: Servos auf, 500 ms warten
-    DS_SHAKE_CLOSE,      // Nachklappen: Servos zu, 400 ms warten
+    DS_FINAL_CLOSE,      // Garantiert schließen, 1000 ms warten
     DS_DONE,             // Servos detachen, zurück zu IDLE
     DS_BLOCK_REVERSE,    // Rückwärts-Fahrt zur Blockadefreigabe
     DS_BLOCK_WAIT,       // 300 ms Pause nach Reverse
@@ -105,4 +105,5 @@ private:
     void _dispNext(DispState s);
     void _svOpen();
     void _svClose();
+    void _svCloseAll();
 };

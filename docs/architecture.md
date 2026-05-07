@@ -107,12 +107,12 @@ Ablauf:
 2. 600 ms warten.
 3. Stepper blockierend mit gleichmaessigen STEP-Pulsen fahren.
 4. 400 ms warten.
-5. Servos schließen.
+5. Beide Servos schließen.
 6. 1000 ms warten.
-7. Servos kurz öffnen.
+7. Gewaehlte Servos kurz öffnen.
 8. 500 ms warten.
-9. Servos schließen.
-10. 400 ms warten.
+9. Beide Servos final schließen.
+10. 1000 ms warten.
 11. Servos detachen, State zurueck auf `DS_IDLE`.
 
 Die Stepperphase ist absichtlich blockierend. Der getestete TMC2208/NEMA17 laeuft
@@ -142,7 +142,8 @@ blockiert. Die Fütter-State-Machine reagiert dann so:
 2. `blockReverseSteps` rueckwaerts fahren.
 3. 300 ms warten.
 4. Bis zu `blockRetries` Wiederholversuche.
-5. Danach Fütterung abbrechen und im Log markieren.
+5. Danach beide Servos final schließen.
+6. Fütterung abbrechen und im Log markieren.
 
 Zur Kalibrierung schreibt die Firmware nach aktiver Blockadeerkennung Peak-Strom
 und minimale gemessene Rotation auf Serial.

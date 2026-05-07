@@ -1,5 +1,30 @@
 # Iterationen
 
+## 2026-05-07 - Servo-Endlage nach Erfolg und Blockade garantiert (1.2.2)
+
+Scope:
+
+- Firmware-Version auf `1.2.2` gesetzt.
+- Fütterungs-State-Machine korrigiert:
+  - Erfolgreiche Fütterung fährt jetzt kontrolliert:
+    `Servo zu -> 1000 ms -> Servo auf -> 500 ms -> Servo final zu -> 1000 ms -> detach`.
+  - Die letzte Zu-Phase wartet jetzt `1000 ms` statt `400 ms`, bevor die Servos
+    detached werden.
+  - Nach Blockade-Abbruch springt die State-Machine nicht mehr direkt nach
+    `DS_DONE`, sondern immer zuerst nach `DS_FINAL_CLOSE`.
+- Finaler Close fährt immer beide Servos auf Zu, auch wenn nur ein einzelner
+  Servo für die Fütterung ausgewählt war.
+
+Erwartetes Verhalten:
+
+- Nach erfolgreicher Fütterung stehen beide Servos geschlossen.
+- Nach Blockade-Abbruch stehen beide Servos geschlossen.
+
+Verifikation:
+
+- `pio run -e esp32dev` erfolgreich.
+- `pio run -e esp32dev_ota` erfolgreich.
+
 ## 2026-05-07 - Dokumentation auf Firmware 1.2.1 geradegezogen
 
 Scope:

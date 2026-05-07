@@ -148,6 +148,7 @@ void Web::_routes() {
         }
         d["spg"]=_c->stepsPerGram; d["spd"]=_c->stepperSpeed;
         d["spu"]=_c->stepperPulseUS; d["sdi"]=_c->stepperInvertDir;
+        d["sds"]=_c->stepperDirSetupUS; d["shm"]=_c->stepperHoldMS;
         d["s1o"]=_c->s1Open; d["s1c"]=_c->s1Close;
         d["s2o"]=_c->s2Open; d["s2c"]=_c->s2Close;
         d["svs"]=_c->servoSpeedDPS;
@@ -179,6 +180,8 @@ void Web::_routes() {
         if (!doc["spd"].isNull()) _c->stepperSpeed = constrain((uint16_t)doc["spd"], 100, 10000);
         if (!doc["spu"].isNull()) _c->stepperPulseUS = constrain((uint16_t)doc["spu"], 2, 50);
         if (!doc["sdi"].isNull()) _c->stepperInvertDir = doc["sdi"];
+        if (!doc["sds"].isNull()) _c->stepperDirSetupUS = constrain((uint16_t)doc["sds"], 0, 2000);
+        if (!doc["shm"].isNull()) _c->stepperHoldMS = constrain((uint16_t)doc["shm"], 0, 5000);
         if (!doc["s1o"].isNull()) _c->s1Open   = doc["s1o"];
         if (!doc["s1c"].isNull()) _c->s1Close  = doc["s1c"];
         if (!doc["s2o"].isNull()) _c->s2Open   = doc["s2o"];
@@ -226,8 +229,7 @@ void Web::_routes() {
     _srv.on("/api/stp", HTTP_POST, bodyHandler, NULL,
         [this](AsyncWebServerRequest *r, uint8_t *d, size_t l, size_t, size_t) {
         JsonDocument doc; deserializeJson(doc, d, l);
-        _mo->configureStepper(*_c);
-        _mo->run(doc["s"]|100);
+        _mo->moveBlocking(doc["s"]|100, *_c);
         r->send(200, "application/json", "{\"ok\":1}");
     });
 

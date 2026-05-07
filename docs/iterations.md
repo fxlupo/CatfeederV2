@@ -138,6 +138,31 @@ Verifikation:
 - `pio run` erfolgreich fuer `esp32dev`.
 - `pio run -e esp32dev_ota` erfolgreich.
 
+## 2026-05-07 - Stepper-Ansteuerung mit Testbaustelle abgeglichen
+
+Scope:
+
+- Stepper-Testlogik aus `CatFeeder_Testbaustelle` mit der aktuellen Firmware
+  verglichen.
+- Relevante Unterschiede:
+  - Testbaustelle faehrt den Stepper blockierend mit festen STEP-Abstaenden.
+  - Aktuelle Firmware fuhr Web-Testfahrten kooperativ im Mainloop und konnte
+    bei Sensor-/Weblast Step-Pulse nachholen, was unruhige Abstaende erzeugt.
+  - Testbaustelle nutzte `10 us` STEP-Puls und `300 us` DIR-Setup; aktuelle
+    Firmware nutzte `5 us` Puls und kein DIR-Setup vor dem ersten STEP.
+- STEP-Puls-Default auf `10 us` und DIR-Setup-Default auf `300 us` gesetzt.
+- Stepper-Testfahrten und Fuetterfahrt laufen jetzt deterministisch blockierend,
+  angelehnt an die Testbaustellen-Funktion.
+- Haltestrom nach Stepperlauf konfigurierbar gemacht; Default `0 ms`, damit der
+  Treiber nach der Bewegung sofort geloest wird.
+- WebUI um DIR-Setup und Haltestrom erweitert.
+- Firmware-Version auf `1.0.6` gesetzt.
+
+Verifikation:
+
+- `pio run -e esp32dev` erfolgreich.
+- `pio run -e esp32dev_ota` erfolgreich.
+
 ## 2026-05-07 - Kalibrierwerte und Geschwindigkeit nachgeschärft
 
 Scope:

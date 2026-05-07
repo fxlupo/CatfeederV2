@@ -18,6 +18,7 @@ public:
     void configureStepper(const Config &c);
     void setSpeed(uint16_t stepsPerSec);
     void run(int32_t steps);                  // +vorwärts, −rückwärts
+    void moveBlocking(int32_t steps, const Config &c);
     void stop();
     bool running()  { return _remain > 0; }
     int32_t pos()   { return _pos; }
@@ -45,6 +46,8 @@ private:
     uint32_t _ivlUS   = 1666;     // µs zwischen Steps
     uint32_t _lastUS  = 0;
     uint16_t _pulseUS = STEPPER_DEFAULT_PULSE_US;
+    uint16_t _dirSetupUS = STEPPER_DEFAULT_DIR_SETUP_US;
+    uint16_t _holdMS = STEPPER_DEFAULT_HOLD_MS;
     bool     _dirInvert = false;
     bool     _enabled = false;
     int16_t  _sv1Pos  = -1;

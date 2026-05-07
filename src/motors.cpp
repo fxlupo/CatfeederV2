@@ -30,6 +30,8 @@ void Motors::drvEnable(bool on) {
 
 void Motors::configureStepper(const Config &c) {
     _pulseUS = constrain(c.stepperPulseUS, 2, 50);
+    _dirSetupUS = constrain(c.stepperDirSetupUS, 0, 2000);
+    _holdMS = constrain(c.stepperHoldMS, 0, 5000);
     _dirInvert = c.stepperInvertDir;
     setSpeed(c.stepperSpeed);
 }
@@ -49,6 +51,7 @@ void Motors::run(int32_t steps) {
     bool dirLevel = steps > 0;
     if (_dirInvert) dirLevel = !dirLevel;
     digitalWrite(PIN_DIR, dirLevel ? HIGH : LOW);
+    delayMicroseconds(_dirSetupUS);
     _lastUS = micros();
     Serial.printf("[Step] %d Steps %s\n", _remain, _dir > 0 ? "→" : "←");
 }
@@ -56,6 +59,42 @@ void Motors::run(int32_t steps) {
 void Motors::stop() {
     _remain = 0;
     drvEnable(false);
+}
+
+void Motors::moveBlocking(int32_t steps, const Config &c) {
+    if (steps == 0) return;
+
+    configureStepper(c);
+    uint32_t periodUS = _ivlUS;
+    uint32_t lowUS = periodUS > _pulseUS ? periodUS - _pulseUS : 5;
+    uint32_t count = abs(steps);
+
+    drvEnable(true);
+    _dir = steps > 0 ? 1 : -1;
+    bool dirLevel = steps > 0;
+    if (_dirInvert) dirLevel = !dirLevel;
+    digitalWrite(PIN_DIR, dirLevel ? HIGH : LOW);
+    delayMicroseconds(_dirSetupUS);
+
+    Serial.printf("[Step] blocking %lu Steps %s @ %lu us\n",
+                  (unsigned long)count, _dir > 0 ? "→" : "←",
+                  (unsigned long)periodUS);
+
+    for (uint32_t i = 0; i < count; i++) {
+        digitalWrite(PIN_STEP, HIGH);
+        delayMicroseconds(_pulseUS);
+        digitalWrite(PIN_STEP, LOW);
+        delayMicroseconds(lowUS);
+        _pos += _dir;
+        if ((i & 0x3F) == 0x3F) yield();
+    }
+
+    if (_holdMS > 0) {
+        delay(_holdMS);
+    }
+    drvEnable(false);
+    _remain = 0;
+    Serial.printf("[Step] Fertig @ pos %d\n", _pos);
 }
 
 void Motors::_pulse() {
@@ -69,10 +108,9 @@ void Motors::loop() {
     static uint32_t idleT = 0;
 
     if (_remain <= 0) {
-        // Nach Stillstand Treiber nach 1 s abschalten
         if (_enabled) {
             if (idleT == 0) idleT = millis();
-            if (millis() - idleT > 1000) { drvEnable(false); idleT = 0; }
+            if (millis() - idleT > _holdMS) { drvEnable(false); idleT = 0; }
         }
         return;
     }
@@ -103,16 +141,8 @@ void Motors::dispense(uint16_t grams, uint8_t servo, const Config &c) {
     delay(600);
 
     // 2. Stepper fördern
-    configureStepper(c);
     int32_t steps = (int32_t)grams * c.stepsPerGram;
-    run(steps);
-
-    uint32_t t0 = millis();
-    while (running() && millis() - t0 < 30000) {
-        loop();
-        yield();
-    }
-    if (running()) { Serial.println(F("[Feed] TIMEOUT")); stop(); }
+    moveBlocking(steps, c);
 
     delay(400);
 

@@ -20,6 +20,8 @@ void CfgManager::defaults(Config &c) {
     c.stepperSpeed = STEPPER_DEFAULT_SPEED;
     c.stepperPulseUS = STEPPER_DEFAULT_PULSE_US;
     c.stepperInvertDir = false;
+    c.stepperDirSetupUS = STEPPER_DEFAULT_DIR_SETUP_US;
+    c.stepperHoldMS = STEPPER_DEFAULT_HOLD_MS;
     c.s1Open       = SERVO_DEFAULT_OPEN;
     c.s1Close      = SERVO_DEFAULT_CLOSE;
     c.s2Open       = SERVO_DEFAULT_OPEN;
@@ -63,6 +65,14 @@ void CfgManager::load(Config &c) {
         }
         if (c.stepperPulseUS < 2 || c.stepperPulseUS > 50) {
             c.stepperPulseUS = STEPPER_DEFAULT_PULSE_US;
+            migrated = true;
+        }
+        if (c.stepperDirSetupUS > 2000) {
+            c.stepperDirSetupUS = STEPPER_DEFAULT_DIR_SETUP_US;
+            migrated = true;
+        }
+        if (c.stepperHoldMS > 5000) {
+            c.stepperHoldMS = STEPPER_DEFAULT_HOLD_MS;
             migrated = true;
         }
         if (c.servoSpeedDPS < 20 || c.servoSpeedDPS > 3000) {

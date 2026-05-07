@@ -6,8 +6,8 @@
 #include <Preferences.h>
 
 // ─── Firmware ───────────────────────────────────────────────────────────────
-#define FW_VERSION             "1.0.5"
-#define CONFIG_SCHEMA_VERSION  3
+#define FW_VERSION             "1.0.6"
+#define CONFIG_SCHEMA_VERSION  4
 
 // ─── WLAN ───────────────────────────────────────────────────────────────────
 #define WIFI_AP_SSID           "CatFeeder-Setup"
@@ -29,7 +29,9 @@
 // ─── Stepper ────────────────────────────────────────────────────────────────
 #define STEPPER_STEPS_REV      200     // NEMA17 Standard (1,8° / Schritt)
 #define STEPPER_DEFAULT_SPEED  1200    // Steps/s
-#define STEPPER_DEFAULT_PULSE_US 5     // Mindest-Pulsdauer µs
+#define STEPPER_DEFAULT_PULSE_US 10    // STEP High-Zeit µs, konservativ fuer TMC/DRV
+#define STEPPER_DEFAULT_DIR_SETUP_US 300 // DIR-Setup-Zeit vor erstem STEP
+#define STEPPER_DEFAULT_HOLD_MS 0      // Treiber nach Lauf sofort loesen
 #define STEPPER_PULSE_US       STEPPER_DEFAULT_PULSE_US
 
 // ─── Servo ──────────────────────────────────────────────────────────────────
@@ -96,6 +98,8 @@ struct Config {
     // Stepper-Feinabstimmung
     uint16_t stepperPulseUS; // STEP High-Zeit in µs
     bool     stepperInvertDir;
+    uint16_t stepperDirSetupUS;
+    uint16_t stepperHoldMS;
 };
 
 struct Status {

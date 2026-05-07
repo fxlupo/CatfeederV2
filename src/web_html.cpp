@@ -175,7 +175,9 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 <div class="g2">
 <div><label>Test-Steps</label><input type="number" id="ts" value="200" min="1" max="50000" step="50"></div>
 <div><label>Geschw. (Steps/s)</label><input type="number" id="cs" value="1200" min="100" max="10000" step="100"></div>
-<div><label>STEP-Puls (µs)</label><input type="number" id="spu" value="5" min="2" max="50" step="1"></div>
+<div><label>STEP-Puls (µs)</label><input type="number" id="spu" value="10" min="2" max="50" step="1"></div>
+<div><label>DIR-Setup (µs)</label><input type="number" id="sds" value="300" min="0" max="2000" step="50"></div>
+<div><label>Haltestrom (ms)</label><input type="number" id="shm" value="0" min="0" max="5000" step="100"></div>
 <div><label>Richtung invertieren</label><select id="sdi"><option value="0">Nein</option><option value="1">Ja</option></select></div>
 <div style="display:flex;align-items:flex-end;gap:4px">
 <button class="bt b2 bs" onclick="tst(1)">&#x25B6; Vor</button>
@@ -261,7 +263,8 @@ async function lc(){
         <option value="2"${s.sv==2?' selected':''}>S2</option></select></div>`;}
   $('fw').textContent=C.fw||'--';
   $('cg').value=C.spg; $('cs').value=C.spd;
-  $('spu').value=C.spu||5; $('sdi').value=C.sdi?1:0;
+  $('spu').value=C.spu||10; $('sds').value=C.sds??300; $('shm').value=C.shm??0;
+  $('sdi').value=C.sdi?1:0;
   $('ss').value=C.svs||1000;
   $('ce').value=C.feM; $('cf').value=C.ffM;
   $('r1').value=C.s1o; $('r1v').textContent=C.s1o+'°';
@@ -275,7 +278,8 @@ function ut(i,v){const p=v.split(':');C.slots[i].h=+p[0];C.slots[i].m=+p[1];}
 // ── Config speichern ──
 async function sav(){
   C.spg=+$('cg').value; C.spd=+$('cs').value;
-  C.spu=+$('spu').value; C.sdi=$('sdi').value==='1';
+  C.spu=+$('spu').value; C.sds=+$('sds').value; C.shm=+$('shm').value;
+  C.sdi=$('sdi').value==='1';
   C.svs=+$('ss').value;
   C.feM=+$('ce').value; C.ffM=+$('cf').value;
   C.tz=+$('tz').value;  C.dst=$('ds').checked;

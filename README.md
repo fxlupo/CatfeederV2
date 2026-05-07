@@ -7,7 +7,7 @@ Scheduler, Sensor-Monitoring und Blockade-Benachrichtigung.
 
 - Zielplattform: ESP32
 - Buildsystem: PlatformIO / Arduino Framework
-- Firmware-Version: `1.2.2`
+- Firmware-Version: `1.2.3`
 - Web UI: lokal ueber HTTP, im Setup-Fall als Access Point
 - OTA: ArduinoOTA ueber WLAN/mDNS vorbereitet
 - Scheduler: taegliche Fuetterungszeiten, Anzahl per Firmware-Konstante

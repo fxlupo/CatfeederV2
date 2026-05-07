@@ -34,7 +34,9 @@ String Web::ip() {
 void Web::_wifi() {
     if (strlen(_c->ssid) > 0) {
         WiFi.mode(WIFI_STA);
+        WiFi.persistent(false);
         WiFi.setHostname(_c->hostname);
+        WiFi.setAutoReconnect(true);
         WiFi.begin(_c->ssid, _c->pass);
         Serial.printf("[WiFi] Verbinde '%s' ", _c->ssid);
         uint32_t t0 = millis();
@@ -44,6 +46,7 @@ void Web::_wifi() {
         if (WiFi.status() == WL_CONNECTED) {
             _ap = false;
             WiFi.setSleep(false);   // Power-Save deaktivieren für stabiles OTA
+            WiFi.setTxPower(WIFI_POWER_19_5dBm);
             Serial.printf("\n[WiFi] OK  IP %s\n", WiFi.localIP().toString().c_str());
             return;
         }
@@ -53,6 +56,7 @@ void Web::_wifi() {
     WiFi.mode(WIFI_AP);
     WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASS);
     WiFi.setSleep(false);
+    WiFi.setTxPower(WIFI_POWER_19_5dBm);
     Serial.printf("[WiFi] AP '%s'  pw '%s'  IP %s\n",
                   WIFI_AP_SSID, WIFI_AP_PASS, WiFi.softAPIP().toString().c_str());
 }

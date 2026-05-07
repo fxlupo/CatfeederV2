@@ -77,6 +77,11 @@ OTA laeuft ueber `ArduinoOTA` auf Port `3232`. Beim Start eines OTA-Vorgangs:
 Bei OTA-Ende oder OTA-Fehler wird `otaActive` wieder zurueckgesetzt. Fehlerphase
 und Fehlergrund sind ueber `/api/diag`, `/api/status` und SSE sichtbar.
 
+Der interne ArduinoOTA-Receive-Timeout ist auf 15 Sekunden erhoeht. Das ist
+wichtig, weil das Firmwareimage durch Web-UI und Benachrichtigung knapp 1.17 MB
+gross ist und einzelne WLAN-Haenger sonst zum Abbruch fuehren koennen. Das
+OTA-Progress-Logging auf Serial ist auf 10-Prozent-Schritte begrenzt.
+
 ## Web und API
 
 Die Weboberflaeche wird direkt aus `web_html.cpp` ausgeliefert. Livewerte kommen

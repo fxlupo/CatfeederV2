@@ -1,5 +1,34 @@
 # Iterationen
 
+## 2026-05-07 - ArduinoOTA fuer grosse Firmware stabilisiert (1.2.3)
+
+Scope:
+
+- Firmware-Version auf `1.2.3` gesetzt.
+- ArduinoOTA internen Receive-Timeout von Default `1000 ms` auf `15000 ms`
+  erhoeht. Ursache: bei einem ~1.17 MB Image reicht ein einzelner WLAN-Haenger
+  ueber 1 Sekunde fuer einen Abbruch mitten im Transfer.
+- OTA-Progress-Logging auf Serial von "jedes Paket" auf 10-Prozent-Schritte
+  reduziert, damit der OTA-Transfer nicht durch UART-Ausgaben gestoert wird.
+- OTA-Upload-Timeout im PlatformIO-Environment von `60` auf `120` Sekunden
+  erhoeht.
+- WLAN robuster fuer OTA konfiguriert:
+  - `WiFi.persistent(false)`
+  - `WiFi.setAutoReconnect(true)`
+  - maximale TX-Power
+  - WiFi-Sleep bleibt deaktiviert
+
+Hinweis:
+
+- Diese Stabilisierung greift erst, nachdem `1.2.3` einmal auf dem ESP laeuft.
+  Wenn die aktuell installierte Firmware OTA nicht zuverlaessig annimmt, muss
+  dieser Stand einmal per USB geflasht werden.
+
+Verifikation:
+
+- `pio run -e esp32dev` erfolgreich.
+- `pio run -e esp32dev_ota` erfolgreich.
+
 ## 2026-05-07 - Servo-Endlage nach Erfolg und Blockade garantiert (1.2.2)
 
 Scope:

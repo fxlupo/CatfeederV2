@@ -25,8 +25,10 @@ static bool    otaReady        = false;
 static bool    otaActive       = false;
 static bool    wasDispensing   = false;
 static bool    pendingEventValid = false;
+static uint8_t otaProgressPct  = 255;
 static FeedEvent pendingEvent;
 static const uint16_t OTA_PORT = 3232;
+static const int OTA_RECEIVE_TIMEOUT_MS = 15000;
 
 static void setOtaPhase(const char *phase) {
     strlcpy(statusData.otaPhase, phase, sizeof(statusData.otaPhase));
@@ -116,9 +118,11 @@ static void syncNTP() {
 static void beginOTA() {
     ArduinoOTA.setHostname(cfg.hostname);
     ArduinoOTA.setPort(OTA_PORT);
+    ArduinoOTA.setTimeout(OTA_RECEIVE_TIMEOUT_MS);
 
     ArduinoOTA.onStart([]() {
         otaActive = true;
+        otaProgressPct = 255;
         setOtaPhase("start");
         notifyEvent(F("OTA start"));
         motors.stop();
@@ -131,7 +135,11 @@ static void beginOTA() {
         notifyEvent(F("OTA complete"));
     });
     ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        Serial.printf("[OTA] %u%%\n", total > 0 ? progress * 100U / total : 0);
+        uint8_t pct = total > 0 ? (uint8_t)(progress * 100U / total) : 0;
+        if (pct != otaProgressPct && (pct % 10 == 0 || pct == 100)) {
+            otaProgressPct = pct;
+            Serial.printf("[OTA] %u%%\n", pct);
+        }
     });
     ArduinoOTA.onError([](ota_error_t error) {
         otaActive = false;       // WICHTIG: Loop wieder freigeben nach Fehler

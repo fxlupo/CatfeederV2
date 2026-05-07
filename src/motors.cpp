@@ -130,7 +130,9 @@ bool Motors::moveBlocking(int32_t steps, const Config &c) {
                 }
                 prevAngle = angle;
 
-                if (curHigh && rotLow) {
+                // OR-Logik: Rotation-Stop allein genügt als Auslöser.
+                // Strom allein reicht nicht (zu geringe Änderung bei diesem Motor).
+                if (rotLow || curHigh) {
                     if (++blockConsec >= 2) {
                         Serial.printf("[Block] Strom=%.0fmA Rot=%.1f° → Blockade!\n",
                                       curMA, minDeltaDeg);

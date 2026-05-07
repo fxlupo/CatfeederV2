@@ -56,6 +56,36 @@ Verifikation:
 - `pio run` erfolgreich für `esp32dev`.
 - RAM: 16.2 %, Flash: 77.3 %.
 
+## 2026-05-07 - Blockadeerkennung: OR-Logik, Schwellen-Default, fillLow-Spam (1.1.6)
+
+Scope:
+
+- Firmware-Version auf `1.1.6` gesetzt.
+
+**Blockadeerkennung: AND → OR**
+- Datenlage aus realen Testfütterungen: Strom ändert sich bei Stall kaum
+  (390–487 mA normal, 446–487 mA beim Stall → Δ < 15 %).
+  Rotation dagegen springt sauber von ~13.5° auf 0°.
+- AND-Bedingung verhinderte Auslösung weil Strom-Threshold nie erreicht wurde.
+- Fix: `rotLow || curHigh` (OR). Rotation-Stop allein reicht als Auslöser.
+  Strom bleibt als Backup im OR, aber mit deutlich höherem Threshold (z.B. 700+ mA).
+
+**blockMinRotPct Default: 30% → 5%**
+- Theoretischer Erwartungswert (115.2°) passt nicht zur Realität (~13.5° gemessen).
+  Tatsächlicher Threshold bei 30% war 34.6° > 13.5° → hätte immer geblockt.
+  Bei 10% war Threshold 11.5° → Margin von nur 2° (13.5° normal − 11.5°).
+  Default jetzt 5% = 5.76° Threshold → klare Trennung (0° geblockt, 13.5° normal).
+  Empfehlung: in der Web-UI den passenden Wert für den eigenen Aufbau finden.
+
+**fillLow / Overcurrent Spam behoben**
+- `notifyEvent` wurde bei jedem Loop-Durchlauf gefeuert solange der Zustand anhielt.
+- Fix: Edge-Detection (steigende Flanke) mit `static bool lastFillLow/Overcurrent`
+  in `refreshStatus()`. Benachrichtigung nur einmalig beim Übergang false→true.
+
+Verifikation:
+
+- `pio run` erfolgreich für `esp32dev`.
+
 ## 2026-05-07 - Blockadeerkennung: Kalibrier-Logging (1.1.5)
 
 Scope:

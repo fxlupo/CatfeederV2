@@ -6,7 +6,7 @@
 #include <Preferences.h>
 
 // ─── Firmware ───────────────────────────────────────────────────────────────
-#define FW_VERSION             "1.1.5"
+#define FW_VERSION             "1.1.6"
 #define CONFIG_SCHEMA_VERSION  7
 
 // ─── WLAN ───────────────────────────────────────────────────────────────────
@@ -49,7 +49,7 @@
 #define STEPPER_DEFAULT_BLOCK_MA  1500 // Blockierstrom-Schwelle mA (Stepper-Stall)
 #define BLOCK_DEFAULT_RETRIES        2 // Max. Wiederholversuche bei Blockade
 #define BLOCK_DEFAULT_REVERSE_STEPS 1000 // Rückwärts-Steps zur Freigabe
-#define BLOCK_DEFAULT_MIN_ROT_PCT   30 // Min. Rotation % pro 64-Schritt-Fenster
+#define BLOCK_DEFAULT_MIN_ROT_PCT    5 // Min. Rotation % pro 64-Schritt-Fenster
 
 // ─── Fütterung ──────────────────────────────────────────────────────────────
 #define MAX_SLOTS              4       // Fütterungszeiten pro Tag

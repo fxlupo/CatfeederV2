@@ -119,8 +119,13 @@ static void refreshStatus() {
     strlcpy(statusData.hostname, cfg.hostname,                 sizeof(statusData.hostname));
     strlcpy(statusData.wifiMode, web.apMode() ? "AP" : "STA", sizeof(statusData.wifiMode));
 
-    if (statusData.overcurrent) notifyEvent(F("Overcurrent detected"));
-    if (statusData.fillLow)     notifyEvent(F("Fill level low"));
+    // Nur auf steigende Flanke feuern – kein Spam bei dauerhaftem Zustand
+    static bool lastOvercurrent = false;
+    static bool lastFillLow     = false;
+    if (statusData.overcurrent && !lastOvercurrent) notifyEvent(F("Overcurrent detected"));
+    if (statusData.fillLow     && !lastFillLow)     notifyEvent(F("Fill level low"));
+    lastOvercurrent = statusData.overcurrent;
+    lastFillLow     = statusData.fillLow;
 }
 
 // ─── Fütterung ──────────────────────────────────────────────────────────────

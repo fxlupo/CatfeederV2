@@ -1,5 +1,39 @@
 # Iterationen
 
+## 2026-05-07 - NVS-Speicherung auf Einzel-Keys umgestellt (1.1.1)
+
+Scope:
+
+- Firmware-Version auf `1.1.1` gesetzt.
+
+Ursache:
+- `save()` speicherte den gesamten Config-Struct als rohen Byte-Blob (`putBytes`).
+- Jede Änderung am Struct (neue Felder, Änderung von MAX_SLOTS o.ä.) verschob
+  die Byte-Offsets aller nachfolgenden Felder.
+- Servo-Kalibrierung liegt nach dem Slots-Array → ging bei jeder Firmware-
+  Änderung verloren, weil die Bytes auf falsche Felder gemappt wurden.
+- Das bisherige Schema-Versions-Prüfung half nicht, da der Struct bereits
+  falsch gelesen war, bevor die Migration griff.
+
+Fix:
+- `save()` und `load()` speichern/lesen jeden Wert unter einem eigenen
+  NVS-Schlüssel (`putUChar`, `putUShort`, `putBool`, `putString` etc.).
+- Struct-Layout-Änderungen sind damit vollständig irrelevant für die Persistenz.
+- Neue Felder bekommen beim ersten Lesen automatisch ihren Default (da Key
+  nicht vorhanden → Preferences gibt den angegebenen Default zurück).
+- `doneToday` pro Slot wird jetzt ebenfalls persistent gespeichert.
+- Alter Blob-Key `cfg` und `schema` werden beim ersten Start bereinigt.
+- Schema-Versionierung ist nicht mehr nötig und entfällt aus der Ladelogik.
+
+⚠️ Einmalige Konsequenz:
+- Beim ersten Flash dieser Version gehen gespeicherte Kalibrierungswerte
+  verloren (alter Blob ist nicht mehr lesbar). Danach bleiben alle Werte
+  bei jedem OTA-Update dauerhaft erhalten.
+
+Verifikation:
+
+- `pio run` erfolgreich für `esp32dev`.
+
 ## 2026-05-07 - NTP-Sync, PWA-Icon, Default-Menge, Event-Log (1.1.0)
 
 Scope:

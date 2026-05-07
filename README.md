@@ -25,7 +25,8 @@ catfeeder/
 ├── README.md
 ├── docs/
 │   ├── architecture.md
-│   └── iterations.md
+│   ├── iterations.md
+│   └── remote-platform-plan.md
 ├── src/
 │   ├── main.cpp          # App-Orchestrierung, OTA, Scheduler, Monitoring
 │   ├── pins.h            # GPIO-Definitionen
@@ -40,6 +41,9 @@ catfeeder/
 
 Das Kalibrierprogramm liegt bewusst unter `tools/`, damit PlatformIO die echte
 Firmware aus `src/` baut.
+
+Der Remote-Plattform-Plan fuer MQTT, Backend, React UI und Push-Service wird in
+`docs/remote-platform-plan.md` als lebendes Arbeitsdokument gepflegt.
 
 ## Build
 

@@ -1,5 +1,29 @@
 # Iterationen
 
+## 2026-05-07 - Remote-Plattform-Plan angelegt
+
+Scope:
+
+- `docs/remote-platform-plan.md` als lebendes Arbeitsdokument angelegt.
+- Zielarchitektur festgelegt:
+  `ESP32 -> MQTT/WebSocket ausgehend -> Mosquitto -> Backend -> React UI -> Push`.
+- Entscheidung dokumentiert:
+  - Scheduler bleibt auf dem ESP.
+  - Externe UI darf Futterzeiten anlegen/aendern/loeschen.
+  - Keine direkte Internet-Exposition des ESP.
+  - Lokale ESP-WebUI wird erst parallel behalten und spaeter auf Minimalmodus
+    reduziert.
+- Iterationen geplant:
+  - Iteration 1: MQTT-Grundlage auf ESP.
+  - Iteration 2: Docker-Plattform mit Mosquitto, umfassendem Backend,
+    moderner React UI und Push-Service.
+  - Iteration 3: Config-Sync, Logs und Remote-Betrieb haerten.
+- README auf den Plan verlinkt.
+
+Verifikation:
+
+- Doku-only.
+
 ## 2026-05-07 - ArduinoOTA fuer grosse Firmware stabilisiert (1.2.3)
 
 Scope:

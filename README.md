@@ -138,6 +138,38 @@ I2C-Geraete:
 - DS3231 `0x68`
 - VL53L0X `0x29`
 
+## Hardware-Einschränkungen
+
+### Custom-PCB — keine Pin-Änderungen möglich
+
+Die Firmware läuft auf einer **individuell angefertigten Platine** mit fest
+verdrahteten GPIO-Belegungen. Alle Pin-Zuweisungen in `pins.h` sind durch das
+PCB-Layout fixiert und können nicht ohne neue Platinenrevision geändert werden.
+
+Konsequenz für Board-Upgrades: ESP32-Varianten mit mehr Flash oder RAM, die
+intern andere GPIOs belegen (z.B. ESP32-WROVER-E belegt GPIO 16/17 für PSRAM),
+sind **kein Drop-in-Ersatz** — GPIO 16 wird für `VL53_XSHUT` benötigt.
+Ein Board-Wechsel würde ein neues PCB-Layout erfordern.
+
+### Flash-Speicher — Headroom beachten
+
+Der Flash-Speicher des verbauten ESP32 beträgt 4 MB. Mit der aktuellen Firmware
+inkl. CallMeBot-Library (HTTPClient + WiFiClientSecure) ergibt sich:
+
+| | Größe |
+| --- | --- |
+| OTA-Slot gesamt | 1.280 KB |
+| Firmware aktuell | ~1.165 KB (~89 %) |
+| Freier Headroom | ~115 KB |
+
+**Entwicklungsregeln für neue Features:**
+
+- Keine weiteren großen Libraries mehr hinzufügen (HTTPClient hat alleine ~150 KB gekostet)
+- Bei kritischem Headroom: LTO (Link-Time-Optimization) aktivieren — spart
+  typisch 10–15 % ohne Funktionsverlust (`build_flags = -Os -flto`)
+- `web_html.cpp` ist der größte Einzelbrocken — bei Bedarf kann HTML/JS
+  komprimiert (gzip) und per `Content-Encoding` ausgeliefert werden
+
 ## Versionierung
 
 Jede fachliche Iteration soll separat committed werden. Laufende Notizen stehen

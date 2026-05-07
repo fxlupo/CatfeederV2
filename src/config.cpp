@@ -35,6 +35,7 @@ void CfgManager::defaults(Config &c) {
 
 void CfgManager::save(const Config &c) {
     _p.putBytes("cfg", &c, sizeof(Config));
+    _p.putUShort("schema", CONFIG_SCHEMA_VERSION);
     Serial.println(F("[Cfg] Gespeichert"));
 }
 
@@ -45,12 +46,28 @@ void CfgManager::load(Config &c) {
         save(c);
     } else {
         Serial.println(F("[Cfg] Geladen"));
+        bool migrated = false;
+
+        uint16_t schema = _p.getUShort("schema", 0);
+        if (schema != CONFIG_SCHEMA_VERSION) migrated = true;
+
+        if (c.stepperSpeed < 100 || c.stepperSpeed > 10000) {
+            c.stepperSpeed = STEPPER_DEFAULT_SPEED;
+            migrated = true;
+        }
+        if (c.servoSpeedDPS < 20 || c.servoSpeedDPS > 3000) {
+            c.servoSpeedDPS = SERVO_DEFAULT_SPEED_DPS;
+            migrated = true;
+        }
+
         if (strlen(c.ssid) == 0 && strlen(WIFI_DEFAULT_SSID) > 0) {
             strlcpy(c.ssid, WIFI_DEFAULT_SSID, sizeof(c.ssid));
             strlcpy(c.pass, WIFI_DEFAULT_PASS, sizeof(c.pass));
-            save(c);
+            migrated = true;
             Serial.println(F("[Cfg] WLAN-Defaults übernommen"));
         }
+
+        if (migrated) save(c);
     }
 }
 

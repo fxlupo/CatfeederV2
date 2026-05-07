@@ -173,12 +173,12 @@ void Web::_routes() {
             }
         }
         if (!doc["spg"].isNull()) _c->stepsPerGram = doc["spg"];
-        if (!doc["spd"].isNull()) _c->stepperSpeed = doc["spd"];
+        if (!doc["spd"].isNull()) _c->stepperSpeed = constrain((uint16_t)doc["spd"], 100, 10000);
         if (!doc["s1o"].isNull()) _c->s1Open   = doc["s1o"];
         if (!doc["s1c"].isNull()) _c->s1Close  = doc["s1c"];
         if (!doc["s2o"].isNull()) _c->s2Open   = doc["s2o"];
         if (!doc["s2c"].isNull()) _c->s2Close  = doc["s2c"];
-        if (!doc["svs"].isNull()) _c->servoSpeedDPS = constrain((uint16_t)doc["svs"], 20, 720);
+        if (!doc["svs"].isNull()) _c->servoSpeedDPS = constrain((uint16_t)doc["svs"], 20, 3000);
         if (!doc["feM"].isNull()) _c->fillEmptyMM = doc["feM"];
         if (!doc["ffM"].isNull()) _c->fillFullMM  = doc["ffM"];
         if (!doc["irt"].isNull()) _c->irThreshold  = doc["irt"];

@@ -167,7 +167,7 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 
 <div class="cd"><h3>&#x1F3CE; Servo-Geschwindigkeit</h3>
 <label>Grad pro Sekunde</label>
-<input type="number" id="ss" value="180" min="20" max="720" step="10"></div>
+<input type="number" id="ss" value="1000" min="20" max="3000" step="50"></div>
 
 <div class="cd"><h3>&#x2699; Stepper</h3>
 <div class="g2">
@@ -180,7 +180,7 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 <label>Steps pro Gramm</label>
 <input type="number" id="cg" value="10" min="1" max="200">
 <label>Stepper-Geschw. (Steps/s)</label>
-<input type="number" id="cs" value="600" min="100" max="2000" step="50"></div>
+<input type="number" id="cs" value="1200" min="100" max="10000" step="100"></div>
 
 <div class="cd"><h3>&#x1F4CF; Füllstand</h3>
 <label>Abstand "Leer" (mm)</label><input type="number" id="ce" value="300" min="50" max="600">
@@ -257,7 +257,7 @@ async function lc(){
         <option value="1"${s.sv==1?' selected':''}>S1</option>
         <option value="2"${s.sv==2?' selected':''}>S2</option></select></div>`;}
   $('cg').value=C.spg; $('cs').value=C.spd;
-  $('ss').value=C.svs||180;
+  $('ss').value=C.svs||1000;
   $('ce').value=C.feM; $('cf').value=C.ffM;
   $('r1').value=C.s1o; $('r1v').textContent=C.s1o+'°';
   $('r2').value=C.s2o; $('r2v').textContent=C.s2o+'°';
@@ -284,7 +284,7 @@ function tsv(n,a){api('/api/sv',{n,a});}
 function cso(n){C['s'+n+'o']=+$('r'+n).value;msg('Servo '+n+' Offen = '+$('r'+n).value+'°');}
 function csc(n){C['s'+n+'c']=+$('r'+n).value;msg('Servo '+n+' Zu = '+$('r'+n).value+'°');}
 async function svcmd(n,cmd){await sav();await api('/api/sv',{n,cmd});msg('Servo '+n+' '+cmd);}
-async function tst(d){const s=+$('ts').value*d;await api('/api/stp',{s});msg(s+' Steps');}
+async function tst(d){await sav();const s=+$('ts').value*d;await api('/api/stp',{s});msg(s+' Steps @ '+$('cs').value+' sps');}
 async function syn(){const n=new Date();
   await api('/api/time',{y:n.getFullYear(),mo:n.getMonth()+1,d:n.getDate(),
     h:n.getHours(),mi:n.getMinutes(),s:n.getSeconds()});msg('Zeit synchronisiert ✓');}

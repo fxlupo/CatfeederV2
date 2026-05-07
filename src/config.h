@@ -6,7 +6,8 @@
 #include <Preferences.h>
 
 // ─── Firmware ───────────────────────────────────────────────────────────────
-#define FW_VERSION             "1.0.2"
+#define FW_VERSION             "1.0.3"
+#define CONFIG_SCHEMA_VERSION  2
 
 // ─── WLAN ───────────────────────────────────────────────────────────────────
 #define WIFI_AP_SSID           "CatFeeder-Setup"
@@ -27,7 +28,7 @@
 
 // ─── Stepper ────────────────────────────────────────────────────────────────
 #define STEPPER_STEPS_REV      200     // NEMA17 Standard (1,8° / Schritt)
-#define STEPPER_DEFAULT_SPEED  600     // Steps/s
+#define STEPPER_DEFAULT_SPEED  1200    // Steps/s
 #define STEPPER_PULSE_US       5       // Mindest-Pulsdauer µs
 
 // ─── Servo ──────────────────────────────────────────────────────────────────
@@ -35,7 +36,7 @@
 #define SERVO_MAX_US           2500
 #define SERVO_DEFAULT_OPEN     90
 #define SERVO_DEFAULT_CLOSE    0
-#define SERVO_DEFAULT_SPEED_DPS 180    // Grad/s für weiche Positionsfahrt
+#define SERVO_DEFAULT_SPEED_DPS 1000   // Grad/s, hohe Werte fahren direkt
 
 // ─── Sensoren ───────────────────────────────────────────────────────────────
 #define FILL_EMPTY_MM          300     // VL53L0X Abstand = Behälter leer

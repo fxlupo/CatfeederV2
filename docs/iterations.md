@@ -137,3 +137,31 @@ Verifikation:
 
 - `pio run` erfolgreich fuer `esp32dev`.
 - `pio run -e esp32dev_ota` erfolgreich.
+
+## 2026-05-07 - Kalibrierwerte und Geschwindigkeit nachgeschärft
+
+Scope:
+
+- Firmware-Version auf `1.0.3` gesetzt.
+- Config-Schema-Version separat im NVS gespeichert, ohne die `Config`-Struktur
+  unnoetig aufzublaehen.
+- Servo-Defaultgeschwindigkeit auf `1000 Grad/s` gesetzt.
+- Servo-Fahrten ab `1000 Grad/s` springen direkt auf die Zielposition, darunter
+  wird weich gerampt.
+- Servo-Geschwindigkeit in der WebUI auf `20..3000 Grad/s` erweitert.
+- Stepper-Defaultgeschwindigkeit auf `1200 Steps/s` gesetzt.
+- Stepper-Geschwindigkeit in der WebUI auf `100..10000 Steps/s` erweitert.
+- Stepper-Test speichert die aktuellen UI-Kalibrierwerte vor der Testfahrt,
+  damit eine geaenderte Geschwindigkeit sofort wirkt.
+
+Persistenz:
+
+- WebUI-Konfiguration wird im ESP32-NVS gespeichert und bleibt bei normalen
+  OTA-Firmwareupdates erhalten.
+- Nur groessere Struktur-/Schemaaenderungen oder ein Werksreset koennen Defaults
+  neu setzen.
+
+Verifikation:
+
+- `pio run` erfolgreich fuer `esp32dev`.
+- `pio run -e esp32dev_ota` erfolgreich.

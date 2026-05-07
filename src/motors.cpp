@@ -123,8 +123,14 @@ void Motors::_writeServo(Servo &servo, int16_t &current, uint8_t pin, uint8_t de
     }
 
     uint16_t speed = c.servoSpeedDPS > 0 ? c.servoSpeedDPS : SERVO_DEFAULT_SPEED_DPS;
+    if (speed >= 1000) {
+        servo.write(deg);
+        current = deg;
+        return;
+    }
+
     uint16_t delayMs = 1000UL / speed;
-    if (delayMs < 5) delayMs = 5;
+    if (delayMs < 1) delayMs = 1;
     int8_t step = deg >= current ? 1 : -1;
 
     while (current != deg) {

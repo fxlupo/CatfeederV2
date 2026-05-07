@@ -29,10 +29,10 @@ void Motors::drvEnable(bool on) {
 }
 
 void Motors::configureStepper(const Config &c) {
-    _pulseUS = constrain(c.stepperPulseUS, 2, 50);
-    _dirSetupUS = constrain(c.stepperDirSetupUS, 0, 2000);
-    _holdMS = constrain(c.stepperHoldMS, 0, 5000);
-    _dirInvert = c.stepperInvertDir;
+    _pulseUS    = constrain(c.stepperPulseUS,    2,    50);
+    _dirSetupUS = constrain(c.stepperDirSetupUS, 0,  2000);
+    _holdMS     = constrain(c.stepperHoldMS,     0,  5000);
+    _dirInvert  = c.stepperInvertDir;
     setSpeed(c.stepperSpeed);
 }
 
@@ -58,6 +58,7 @@ void Motors::run(int32_t steps) {
 
 void Motors::stop() {
     _remain = 0;
+    _dispState = DS_IDLE;
     drvEnable(false);
 }
 
@@ -89,9 +90,7 @@ void Motors::moveBlocking(int32_t steps, const Config &c) {
         if ((i & 0x3F) == 0x3F) yield();
     }
 
-    if (_holdMS > 0) {
-        delay(_holdMS);
-    }
+    if (_holdMS > 0) delay(_holdMS);
     drvEnable(false);
     _remain = 0;
     Serial.printf("[Step] Fertig @ pos %d\n", _pos);
@@ -105,29 +104,26 @@ void Motors::_pulse() {
 }
 
 void Motors::loop() {
+    // ── Stepper-Schritte abarbeiten ──────────────────────────────────────────
     static uint32_t idleT = 0;
-
-    if (_remain <= 0) {
-        if (_enabled) {
-            if (idleT == 0) idleT = millis();
-            if (millis() - idleT > _holdMS) { drvEnable(false); idleT = 0; }
+    if (_remain > 0) {
+        idleT = 0;
+        uint8_t pulses = 0;
+        while (_remain > 0 && (uint32_t)(micros() - _lastUS) >= _ivlUS) {
+            _pulse();
+            _remain--;
+            _lastUS += _ivlUS;
+            if (++pulses >= 16) break;
         }
-        return;
-    }
-
-    idleT = 0;
-    uint8_t pulses = 0;
-    while (_remain > 0 && (uint32_t)(micros() - _lastUS) >= _ivlUS) {
-        _pulse();
-        _remain--;
-        _lastUS += _ivlUS;
-        pulses++;
-        if (_remain == 0) {
+        if (_remain == 0)
             Serial.printf("[Step] Fertig @ pos %d\n", _pos);
-            break;
-        }
-        if (pulses >= 16) break;
+    } else if (_enabled) {
+        if (idleT == 0) idleT = millis();
+        if (millis() - idleT > _holdMS) { drvEnable(false); idleT = 0; }
     }
+
+    // ── Fütterungs-State-Machine ─────────────────────────────────────────────
+    _dispenseLoop();
 }
 
 // ═══════════════════════ Selbsttest ═════════════════════════════════════════
@@ -135,58 +131,92 @@ void Motors::loop() {
 void Motors::selfTest(const Config &c) {
     Serial.println(F("[SelfTest] Start"));
 
-    // Stepper: 50 Schritte vor, 50 zurück
     moveBlocking(50, c);
     delay(200);
     moveBlocking(-50, c);
     delay(300);
 
-    // Servo 1: auf → zu
-    s1Open(c);
-    delay(600);
-    s1Close(c);
-    delay(400);
-
-    // Servo 2: auf → zu
-    s2Open(c);
-    delay(600);
-    s2Close(c);
-    delay(400);
+    s1Open(c);  delay(600);
+    s1Close(c); delay(400);
+    s2Open(c);  delay(600);
+    s2Close(c); delay(400);
 
     detachServos();
     Serial.println(F("[SelfTest] OK"));
 }
 
-// ═══════════════════════ Fütterung ══════════════════════════════════════════
+// ═══════════════════════ Fütterungs-State-Machine ═══════════════════════════
 
 void Motors::dispense(uint16_t grams, uint8_t servo, const Config &c) {
-    Serial.printf("[Feed] %dg  Servo=%d\n", grams, servo);
+    if (_dispState != DS_IDLE) return;  // läuft noch
+    Serial.printf("[Feed] start %dg servo=%d\n", grams, servo);
+    _dispGrams = grams;
+    _dispServo = servo;
+    _dispCfg   = &c;
+    _dispNext(DS_SERVO_OPEN);
+}
 
-    // 1. Klappen öffnen
-    if (servo == 0 || servo == 1) s1Open(c);
-    if (servo == 0 || servo == 2) s2Open(c);
-    delay(600);
+void Motors::_dispNext(DispState s) {
+    _dispState = s;
+    _dispNew   = true;
+}
 
-    // 2. Stepper fördern
-    int32_t steps = (int32_t)grams * c.stepsPerGram;
-    moveBlocking(steps, c);
-    delay(400);
+void Motors::_svOpen() {
+    if (_dispServo == 0 || _dispServo == 1) s1Open(*_dispCfg);
+    if (_dispServo == 0 || _dispServo == 2) s2Open(*_dispCfg);
+}
 
-    // 3. Klappen schließen
-    if (servo == 0 || servo == 1) s1Close(c);
-    if (servo == 0 || servo == 2) s2Close(c);
-    delay(1000);
+void Motors::_svClose() {
+    if (_dispServo == 0 || _dispServo == 1) s1Close(*_dispCfg);
+    if (_dispServo == 0 || _dispServo == 2) s2Close(*_dispCfg);
+}
 
-    // 4. Nachklappen: einmal auf/zu zum Abklopfen von Futterresten
-    if (servo == 0 || servo == 1) s1Open(c);
-    if (servo == 0 || servo == 2) s2Open(c);
-    delay(500);
-    if (servo == 0 || servo == 1) s1Close(c);
-    if (servo == 0 || servo == 2) s2Close(c);
-    delay(400);
+void Motors::_dispenseLoop() {
+    switch (_dispState) {
 
-    detachServos();
-    Serial.println(F("[Feed] Fertig"));
+        case DS_IDLE:
+            return;
+
+        case DS_SERVO_OPEN:
+            if (_dispNew) { _svOpen(); _dispTimer = millis(); _dispNew = false; }
+            if (millis() - _dispTimer >= 600) _dispNext(DS_STEPPER);
+            break;
+
+        case DS_STEPPER:
+            if (_dispNew) {
+                _dispNew = false;
+                configureStepper(*_dispCfg);
+                run((int32_t)_dispGrams * _dispCfg->stepsPerGram);
+            }
+            if (!running()) _dispNext(DS_STEPPER_WAIT);
+            break;
+
+        case DS_STEPPER_WAIT:
+            if (_dispNew) { _dispTimer = millis(); _dispNew = false; }
+            if (millis() - _dispTimer >= 400) _dispNext(DS_SERVO_CLOSE);
+            break;
+
+        case DS_SERVO_CLOSE:
+            if (_dispNew) { _svClose(); _dispTimer = millis(); _dispNew = false; }
+            if (millis() - _dispTimer >= 1000) _dispNext(DS_SHAKE_OPEN);
+            break;
+
+        case DS_SHAKE_OPEN:
+            if (_dispNew) { _svOpen(); _dispTimer = millis(); _dispNew = false; }
+            if (millis() - _dispTimer >= 500) _dispNext(DS_SHAKE_CLOSE);
+            break;
+
+        case DS_SHAKE_CLOSE:
+            if (_dispNew) { _svClose(); _dispTimer = millis(); _dispNew = false; }
+            if (millis() - _dispTimer >= 400) _dispNext(DS_DONE);
+            break;
+
+        case DS_DONE:
+            detachServos();
+            Serial.println(F("[Feed] Fertig"));
+            _dispState = DS_IDLE;
+            break;
+    }
 }
 
 // ═══════════════════════ Servos ═════════════════════════════════════════════
@@ -211,7 +241,6 @@ void Motors::_writeServo(Servo &servo, int16_t &current, uint8_t pin, uint8_t de
     uint16_t delayMs = 1000UL / speed;
     if (delayMs < 1) delayMs = 1;
     int8_t step = deg >= current ? 1 : -1;
-
     while (current != deg) {
         current += step;
         servo.write(current);

@@ -16,11 +16,11 @@ Sensors sensors;
 Motors motors;
 Web web;
 
-static uint8_t lastMinute = 255;
-static bool dayResetDone = false;
-static bool feedInProgress = false;
-static bool otaReady      = false;
-static bool otaActive     = false;
+static uint8_t lastMinute   = 255;
+static bool    dayResetDone = false;
+static bool    otaReady     = false;
+static bool    otaActive    = false;
+static bool    wasDispensing= false;   // Flanken-Erkennung Fütterungsende
 static const uint16_t OTA_PORT = 3232;
 
 static void setOtaPhase(const char *phase) {
@@ -64,12 +64,12 @@ static void beginOTA() {
     ArduinoOTA.onError([](ota_error_t error) {
         setOtaPhase("error");
         switch (error) {
-            case OTA_AUTH_ERROR: setOtaError("auth"); break;
-            case OTA_BEGIN_ERROR: setOtaError("begin"); break;
+            case OTA_AUTH_ERROR:    setOtaError("auth");    break;
+            case OTA_BEGIN_ERROR:   setOtaError("begin");   break;
             case OTA_CONNECT_ERROR: setOtaError("connect"); break;
             case OTA_RECEIVE_ERROR: setOtaError("receive"); break;
-            case OTA_END_ERROR: setOtaError("end"); break;
-            default: setOtaError("unknown"); break;
+            case OTA_END_ERROR:     setOtaError("end");     break;
+            default:                setOtaError("unknown"); break;
         }
         Serial.printf("[OTA] error=%u\n", error);
     });
@@ -84,33 +84,28 @@ static void beginOTA() {
 static void refreshStatus() {
     sensors.update();
     sensors.fillStatus(statusData, cfg);
-    statusData.feeds = cfgMgr.loadFeedCount();
-    statusData.wifiOK = !web.apMode();
-    statusData.apMode = web.apMode();
+    statusData.feeds    = cfgMgr.loadFeedCount();
+    statusData.wifiOK   = !web.apMode();
+    statusData.apMode   = web.apMode();
     statusData.otaReady = otaReady;
-    statusData.otaPort = OTA_PORT;
+    statusData.otaPort  = OTA_PORT;
     statusData.wifiRSSI = WiFi.isConnected() ? WiFi.RSSI() : 0;
-    strlcpy(statusData.ip, web.ip().c_str(), sizeof(statusData.ip));
-    strlcpy(statusData.hostname, cfg.hostname, sizeof(statusData.hostname));
-    strlcpy(statusData.wifiMode, web.apMode() ? "AP" : "STA", sizeof(statusData.wifiMode));
+    strlcpy(statusData.ip,       web.ip().c_str(),              sizeof(statusData.ip));
+    strlcpy(statusData.hostname, cfg.hostname,                  sizeof(statusData.hostname));
+    strlcpy(statusData.wifiMode, web.apMode() ? "AP" : "STA",  sizeof(statusData.wifiMode));
 
     if (statusData.overcurrent) notifyEvent(F("Overcurrent detected"));
-    if (statusData.fillLow) notifyEvent(F("Fill level low"));
+    if (statusData.fillLow)     notifyEvent(F("Fill level low"));
 }
 
-static void runFeed(uint16_t grams, uint8_t servo, const char *reason) {
-    if (feedInProgress) {
+// Fütterung starten – kehrt sofort zurück, State Machine läuft in loop()
+static void startFeed(uint16_t grams, uint8_t servo, const char *reason) {
+    if (motors.dispensing()) {
         Serial.println(F("[Feed] ignored: already running"));
         return;
     }
-
-    feedInProgress = true;
     Serial.printf("[Feed] reason=%s grams=%u servo=%u\n", reason, grams, servo);
     motors.dispense(grams, servo, cfg);
-    statusData.feeds++;
-    cfgMgr.saveFeedCount(statusData.feeds);
-    notifyEvent("Feeding completed");
-    feedInProgress = false;
 }
 
 static void resetDailyScheduleIfNeeded(uint8_t hour, uint8_t minute) {
@@ -127,9 +122,9 @@ static void resetDailyScheduleIfNeeded(uint8_t hour, uint8_t minute) {
 }
 
 static void schedulerLoop() {
-    if (!sensors.ok_rtc || feedInProgress) return;
+    if (!sensors.ok_rtc || motors.dispensing()) return;
 
-    uint8_t hour = sensors.hour();
+    uint8_t hour   = sensors.hour();
     uint8_t minute = sensors.minute();
     resetDailyScheduleIfNeeded(hour, minute);
 
@@ -143,7 +138,7 @@ static void schedulerLoop() {
 
         slot.doneToday = true;
         cfgMgr.save(cfg);
-        runFeed(slot.grams, slot.servo, "schedule");
+        startFeed(slot.grams, slot.servo, "schedule");
         break;
     }
 }
@@ -151,9 +146,20 @@ static void schedulerLoop() {
 static void handleWebFeedRequest() {
     if (!web.feedRequested) return;
     uint16_t grams = web.feedGrams;
-    uint8_t servo = web.feedServo;
+    uint8_t  servo = web.feedServo;
     web.feedRequested = false;
-    runFeed(grams, servo, "web");
+    startFeed(grams, servo, "web");
+}
+
+// Fütterungsende erkennen (Flanke dispensing: true→false)
+static void checkFeedComplete() {
+    bool nowDispensing = motors.dispensing();
+    if (wasDispensing && !nowDispensing) {
+        statusData.feeds++;
+        cfgMgr.saveFeedCount(statusData.feeds);
+        notifyEvent("Feeding completed");
+    }
+    wasDispensing = nowDispensing;
 }
 
 void setup() {
@@ -186,6 +192,7 @@ void loop() {
     refreshStatus();
     web.loop();
     handleWebFeedRequest();
+    checkFeedComplete();
     schedulerLoop();
     yield();
 }

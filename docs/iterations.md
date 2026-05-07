@@ -1,5 +1,27 @@
 # Iterationen
 
+## 2026-05-07 - Dokumentation auf Firmware 1.2.1 geradegezogen
+
+Scope:
+
+- README von fixer Slot-Zahl auf `MAX_SLOTS`-basierte, firmwarekonfigurierbare
+  Fuetterungszeiten umgestellt.
+- README um aktuellen Stand zu Blockadeerkennung, Feed-Log, WhatsApp und API
+  ergaenzt.
+- `docs/architecture.md` auf aktuellen Stand gebracht:
+  - NVS-Einzelkeys statt Struct-Blob
+  - Fütterungs-State-Machine mit bewusst blockierender Stepperphase
+  - aktive Blockadeerkennung per AS5600/INA219
+  - Feed-Logging
+  - OTA-Stabilisierung
+  - WhatsApp-Task auf Core 0
+- Veraltete Aussagen zu "spaeterer" Blockadeauswertung und noch blockierendem
+  Gesamt-Fuetterungsablauf entfernt.
+
+Verifikation:
+
+- `git diff --check` erfolgreich.
+
 ## 2026-05-07 - Blockadeerkennung mit Richtungsumkehr (1.1.4)
 
 Scope:

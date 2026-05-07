@@ -1,7 +1,7 @@
 # CatFeeder ESP32 Firmware
 
 Zeitgesteuerter Katzenfutter-Automat mit lokaler Weboberflaeche, OTA,
-Scheduler, Sensor-Monitoring und vorbereiteten Benachrichtigungs-Hooks.
+Scheduler, Sensor-Monitoring und Blockade-Benachrichtigung.
 
 ## Status
 
@@ -10,8 +10,12 @@ Scheduler, Sensor-Monitoring und vorbereiteten Benachrichtigungs-Hooks.
 - Firmware-Version: `1.2.1`
 - Web UI: lokal ueber HTTP, im Setup-Fall als Access Point
 - OTA: ArduinoOTA ueber WLAN/mDNS vorbereitet
-- Scheduler: bis zu 8 taegliche Fuetterungszeiten
+- Scheduler: taegliche Fuetterungszeiten, Anzahl per Firmware-Konstante
+  `MAX_SLOTS` konfigurierbar
 - Monitoring: Sensorstatus, Strom, Fuellstand, IR, Uptime, Heap
+- Blockadeerkennung: AS5600-Rotation plus INA219-Strom, mit Rueckwaertsfahrt
+  und Wiederholversuchen
+- Benachrichtigung: WhatsApp via CallMeBot bei abgebrochener Fuetterung
 
 ## Projektstruktur
 
@@ -72,9 +76,16 @@ pio run --target upload --upload-port catfeeder.local
 Tabs:
 
 - Status: Live-Dashboard, Sofort-Fuettern, Sensoren, Fuellstand, Strom, System
-- Zeiten: bis zu 8 taegliche Fuetterungszeiten
-- Kalibrierung: Servo-Winkel, Servo-Geschwindigkeit, Stepper-Test, Steps pro Gramm, Fuellstandsgrenzen
-- Einstellungen: WLAN, RTC-Sync, Zeitzone, Hostname, Werksreset
+- Zeiten: taegliche Fuetterungszeiten, Menge und Servo-Auswahl
+- Kalibrierung: Servo-Winkel, Servo-Geschwindigkeit, Stepper-Test,
+  Steps pro Gramm, Blockadeerkennung, Fuellstandsgrenzen
+- Einstellungen: Standardmenge, WLAN, RTC/NTP-Zeit, Zeitzone, WhatsApp,
+  Hostname, Werksreset
+- Log: letzte Fuetterungen mit Menge, Fuellstand, IR-Impulsen und Blockade-Status
+
+Die Anzahl der Zeitplaetze ist kein festes Produktlimit der UI, sondern wird in
+der Firmware ueber `MAX_SLOTS` bestimmt. Wird dieser Wert in `src/config.h`
+angepasst, liefert `/api/config` entsprechend mehr oder weniger Slots aus.
 
 ## Selbsttest beim Start
 
@@ -98,12 +109,37 @@ Jede Fütterung (manuell oder per Zeitplan) folgt diesem Ablauf:
 5. Nachklappen – Servos einmal kurz auf/zu zum Abklopfen von Futterresten
 6. Servos werden abgeschaltet (kein Haltestrom)
 
+Während der Stepperphase wird die Bewegung blockierend mit gleichmäßigen
+STEP-Pulsen gefahren. Das ist bewusst so gehalten, weil der verbaute
+TMC2208/NEMA17 damit deutlich ruhiger läuft als mit Mainloop-getakteten Pulsen.
+Parallel werden IR-Flanken gezählt und, bei Fütterungen, AS5600/INA219 für die
+Blockadeerkennung ausgewertet.
+
+## Blockadeerkennung
+
+Eine Blockade wird während der Fütter-Stepperphase erkannt. Die Prüfung kombiniert:
+
+- AS5600: zu wenig Rotation pro Messfenster
+- INA219: Strom oberhalb der konfigurierten Schwelle
+
+Die relevanten Werte sind in der Web-UI unter Kalibrierung einstellbar:
+
+- Strom-Schwelle `stepperBlockMA`
+- minimale Rotation `blockMinRotPct`
+- Rueckwaerts-Schritte `blockReverseSteps`
+- maximale Wiederholversuche `blockRetries`
+
+Bei erkannter Blockade stoppt die Fütterung, fährt rueckwaerts, wartet kurz und
+versucht erneut. Nach zu vielen Fehlversuchen wird die Fütterung abgebrochen,
+im Log markiert und optional per WhatsApp gemeldet.
+
 ## REST API
 
 | Methode | Endpunkt | Zweck |
 | --- | --- | --- |
 | `GET` | `/` | Webinterface |
 | `GET` | `/api/status` | Status als JSON |
+| `GET` | `/api/diag` | OTA/WLAN/Systemdiagnose |
 | `GET` | `/api/config` | Konfiguration lesen |
 | `POST` | `/api/config` | Konfiguration speichern |
 | `POST` | `/api/feed` | Sofort-Fuetterung anfordern |
@@ -112,6 +148,7 @@ Jede Fütterung (manuell oder per Zeitplan) folgt diesem Ablauf:
 | `POST` | `/api/time` | RTC synchronisieren |
 | `POST` | `/api/wifi` | WLAN speichern und neu starten |
 | `POST` | `/api/reset` | Werkseinstellungen |
+| `GET` | `/api/log` | Fuetterungslog aus dem RAM |
 | `SSE` | `/events` | Live-Updates im 2-Sekunden-Takt |
 
 ## Pin-Belegung

@@ -66,22 +66,29 @@ void Motors::_pulse() {
 }
 
 void Motors::loop() {
+    static uint32_t idleT = 0;
+
     if (_remain <= 0) {
         // Nach Stillstand Treiber nach 1 s abschalten
         if (_enabled) {
-            static uint32_t idleT = 0;
             if (idleT == 0) idleT = millis();
             if (millis() - idleT > 1000) { drvEnable(false); idleT = 0; }
         }
         return;
     }
-    uint32_t now = micros();
-    if (now - _lastUS >= _ivlUS) {
+
+    idleT = 0;
+    uint8_t pulses = 0;
+    while (_remain > 0 && (uint32_t)(micros() - _lastUS) >= _ivlUS) {
         _pulse();
         _remain--;
-        _lastUS = now;
-        if (_remain == 0)
+        _lastUS += _ivlUS;
+        pulses++;
+        if (_remain == 0) {
             Serial.printf("[Step] Fertig @ pos %d\n", _pos);
+            break;
+        }
+        if (pulses >= 16) break;
     }
 }
 

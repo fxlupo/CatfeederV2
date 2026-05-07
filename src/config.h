@@ -6,7 +6,7 @@
 #include <Preferences.h>
 
 // ─── Firmware ───────────────────────────────────────────────────────────────
-#define FW_VERSION             "1.0.4"
+#define FW_VERSION             "1.0.5"
 #define CONFIG_SCHEMA_VERSION  3
 
 // ─── WLAN ───────────────────────────────────────────────────────────────────

@@ -182,5 +182,5 @@ void loop() {
     web.loop();
     handleWebFeedRequest();
     schedulerLoop();
-    delay(5);
+    yield();
 }

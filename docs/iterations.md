@@ -187,3 +187,21 @@ Verifikation:
 
 - `pio run` erfolgreich fuer `esp32dev`.
 - `pio run -e esp32dev_ota` erfolgreich.
+
+## 2026-05-07 - Stepper-Speed-Limit im Mainloop behoben
+
+Scope:
+
+- Ursache fuer scheinbar wirkungslose Stepper-Geschwindigkeit gefunden:
+  `delay(5)` im Hauptloop begrenzte Web-Testfahrten effektiv auf ca. 200
+  Motorloop-Aufrufe pro Sekunde.
+- `delay(5)` durch `yield()` ersetzt.
+- `Motors::loop()` arbeitet jetzt bis zu 16 faellige Step-Pulse pro Aufruf ab,
+  damit eingestellte Steps/s auch bei Webserver-/Sensorlast besser erreicht
+  werden.
+- Firmware-Version auf `1.0.5` gesetzt.
+
+Verifikation:
+
+- `pio run` erfolgreich fuer `esp32dev`.
+- `pio run -e esp32dev_ota` erfolgreich.

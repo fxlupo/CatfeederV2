@@ -277,10 +277,10 @@ void Web::_routes() {
             o["a"]   = e.isAuto;
             o["g"]   = e.grams;
             o["sv"]  = e.servo;
-            o["db"]  = e.distBefore; o["da"] = e.distAfter;
-            o["fb"]  = e.fillBefore; o["fa"] = e.fillAfter;
-            o["i1b"] = e.ir1Before;  o["i2b"] = e.ir2Before;
-            o["i1a"] = e.ir1After;   o["i2a"] = e.ir2After;
+            o["db"]  = e.distBefore; o["da"]  = e.distAfter;
+            o["fb"]  = e.fillBefore; o["fa"]  = e.fillAfter;
+            o["i1p"] = e.ir1Pulses;
+            o["i2p"] = e.ir2Pulses;
         }
         String j; serializeJson(d, j);
         r->send(200, "application/json", j);

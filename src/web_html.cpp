@@ -47,6 +47,7 @@ nav button.on{color:var(--ac);border-bottom-color:var(--ac)}
 .led{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px}
 .led.g{background:var(--ok);box-shadow:0 0 5px var(--ok)}
 .led.r{background:var(--er);box-shadow:0 0 5px var(--er)}
+.led.y{background:var(--wn);box-shadow:0 0 5px var(--wn)}
 .sr{display:flex;justify-content:space-between;align-items:center;padding:5px 0;
     border-bottom:1px solid rgba(255,255,255,.04);font-size:.82em}
 .sr:last-child{border:none}
@@ -129,7 +130,9 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 <div class="sr"><span>VL53L0X</span><span id="lv"></span></div>
 <div class="sr"><span>AS5600</span><span id="la"></span></div>
 <div class="sr"><span>DS3231 RTC</span><span id="lr"></span></div>
-<div class="sr"><span>Encoder</span><span id="ae">--°</span></div></div>
+<div class="sr"><span>Encoder</span><span id="ae">--°</span></div>
+<div class="sr"><span>IR 1</span><span id="li1"><span class="led y"></span>--</span></div>
+<div class="sr"><span>IR 2</span><span id="li2"><span class="led y"></span>--</span></div></div>
 
 <div class="cd"><h3>&#x1F4A1; IR Sensoren</h3>
 <div class="g2">
@@ -350,7 +353,8 @@ async function loadLog(){
         <div class="st"><div class="v">${e.g}g</div><div class="l">${sv[e.sv]||'?'}</div></div>
         <div class="st"><div class="v">${e.fb}%&rarr;${e.fa}%</div><div class="l">Füllstand</div></div>
         <div class="st"><div class="v">${e.db}&rarr;${e.da}</div><div class="l">VL53 mm</div></div>
-        <div class="st"><div class="v">${e.i1b}/${e.i2b}</div><div class="l">IR vor</div></div>
+        <div class="st"><div class="v">${e.i1p??'—'}</div><div class="l">IR1 Impulse</div></div>
+        <div class="st"><div class="v">${e.i2p??'—'}</div><div class="l">IR2 Impulse</div></div>
       </div>
     </div>`).join('');
 }
@@ -374,6 +378,7 @@ function sse(){
     const ir=d.ir||{};
     $('i1a').textContent=ir.a1||0; $('i2a').textContent=ir.a2||0;
     $('i1d').textContent=ir.d1?'HIGH':'LOW'; $('i2d').textContent=ir.d2?'HIGH':'LOW';
+    irled('li1',ir.d1); irled('li2',ir.d2);
     $('su').textContent=upt(d.up||0);
     $('sh').textContent=((d.hp||0)/1024).toFixed(1)+' kB';
     $('sfc').textContent=d.fc||0;
@@ -383,6 +388,8 @@ function sse(){
 }
 function led(id,on){const e=$(id);if(!e)return;
   e.innerHTML='<span class="led '+(on?'g':'r')+'"></span>'+(on?'OK':'—');}
+function irled(id,v){const e=$(id);if(!e)return;
+  e.innerHTML='<span class="led '+(v?'g':'y')+'"></span>'+(v?'HIGH':'LOW');}
 function upt(s){const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
   return(d?d+'d ':'')+h+'h '+m+'m';}
 

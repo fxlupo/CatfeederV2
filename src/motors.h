@@ -54,6 +54,10 @@ public:
     void dispense(uint16_t grams, uint8_t servo, const Config &c);
     bool dispensing() { return _dispState != DS_IDLE; }
 
+    // IR-Impulszähler – gültig nach dispensing() → false
+    uint16_t irCount1() { return _irCount1; }
+    uint16_t irCount2() { return _irCount2; }
+
 private:
     Servo _sv1, _sv2;
 
@@ -70,6 +74,11 @@ private:
     bool     _enabled    = false;
     int16_t  _sv1Pos     = -1;
     int16_t  _sv2Pos     = -1;
+
+    // IR-Impulszähler (nur aktiv während dispense())
+    bool     _countIR  = false;
+    uint16_t _irCount1 = 0;
+    uint16_t _irCount2 = 0;
 
     // Fütterungs-State-Machine
     DispState        _dispState = DS_IDLE;

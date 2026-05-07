@@ -1,5 +1,35 @@
 # Iterationen
 
+## 2026-05-07 - IR-Impulszählung und Sensorübersicht (1.1.2)
+
+Scope:
+
+- Firmware-Version auf `1.1.2` gesetzt.
+
+**IR-Impulszählung während Fütterung:**
+- `Motors::moveBlocking()` zählt Flanken (HIGH↔LOW) auf `PIN_IR1_D0` und
+  `PIN_IR2_D0` im `yield()`-Fenster alle 64 Schritte (~53 ms bei 1200 Steps/s).
+- Flag `_countIR` stellt sicher, dass nur während `dispense()` gezählt wird —
+  kein Zählen beim Selbsttest oder Web-Testfahrt.
+- Zähler werden in `dispense()` auf 0 zurückgesetzt, in `DS_STEPPER` aktiviert
+  und nach `moveBlocking()` deaktiviert.
+
+**Event-Log:**
+- `FeedEvent` ersetzt `ir1Before/2Before/ir1After/ir2After` durch
+  `ir1Pulses` / `ir2Pulses` (Flanken-Zähler während Stepper-Lauf).
+- REST-API `/api/log`: Keys `i1p` / `i2p` statt bisheriger IR-Felder.
+- Log-Tab: zeigt "IR1 Impulse" / "IR2 Impulse" pro Fütterung.
+
+**Sensorübersicht:**
+- IR1 / IR2 mit LED-Statusanzeige (grün = HIGH, gelb = LOW) direkt in der
+  Sensoren-Karte (neben INA219, VL53, AS5600, DS3231).
+- Neue CSS-Klasse `.led.y` (gelb/warning) für Zustandsanzeige.
+- Neue JS-Funktion `irled()` für farbige IR-Statusaktualisierung via SSE.
+
+Verifikation:
+
+- `pio run` erfolgreich für `esp32dev`.
+
 ## 2026-05-07 - NVS-Speicherung auf Einzel-Keys umgestellt (1.1.1)
 
 Scope:

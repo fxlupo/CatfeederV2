@@ -6,7 +6,7 @@
 #include <Preferences.h>
 
 // ─── Firmware ───────────────────────────────────────────────────────────────
-#define FW_VERSION             "1.1.1"
+#define FW_VERSION             "1.1.2"
 #define CONFIG_SCHEMA_VERSION  6
 
 // ─── WLAN ───────────────────────────────────────────────────────────────────
@@ -168,10 +168,8 @@ struct FeedEvent {
     uint16_t distAfter;    // VL53L0X mm nach Fütterung
     uint8_t  fillBefore;   // Füllstand % vor
     uint8_t  fillAfter;    // Füllstand % nach
-    uint16_t ir1Before;    // IR1 analog vor
-    uint16_t ir2Before;    // IR2 analog vor
-    uint16_t ir1After;     // IR1 analog nach
-    uint16_t ir2After;     // IR2 analog nach
+    uint16_t ir1Pulses;    // Flanken-Impulse IR1 während Stepper-Lauf
+    uint16_t ir2Pulses;    // Flanken-Impulse IR2 während Stepper-Lauf
 };
 
 struct FeedLog {

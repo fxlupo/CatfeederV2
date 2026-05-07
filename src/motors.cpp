@@ -81,13 +81,24 @@ void Motors::moveBlocking(int32_t steps, const Config &c) {
                   (unsigned long)count, _dir > 0 ? "→" : "←",
                   (unsigned long)periodUS);
 
+    bool ir1Last = digitalRead(PIN_IR1_D0);
+    bool ir2Last = digitalRead(PIN_IR2_D0);
+
     for (uint32_t i = 0; i < count; i++) {
         digitalWrite(PIN_STEP, HIGH);
         delayMicroseconds(_pulseUS);
         digitalWrite(PIN_STEP, LOW);
         delayMicroseconds(lowUS);
         _pos += _dir;
-        if ((i & 0x3F) == 0x3F) yield();
+        if ((i & 0x3F) == 0x3F) {
+            yield();
+            if (_countIR) {
+                bool s1 = digitalRead(PIN_IR1_D0);
+                bool s2 = digitalRead(PIN_IR2_D0);
+                if (s1 != ir1Last) { _irCount1++; ir1Last = s1; }
+                if (s2 != ir2Last) { _irCount2++; ir2Last = s2; }
+            }
+        }
     }
 
     if (_holdMS > 0) delay(_holdMS);
@@ -153,6 +164,9 @@ void Motors::dispense(uint16_t grams, uint8_t servo, const Config &c) {
     _dispGrams = grams;
     _dispServo = servo;
     _dispCfg   = &c;
+    _irCount1  = 0;
+    _irCount2  = 0;
+    _countIR   = false;   // wird in DS_STEPPER aktiviert
     _dispNext(DS_SERVO_OPEN);
 }
 
@@ -184,12 +198,10 @@ void Motors::_dispenseLoop() {
 
         case DS_STEPPER:
             if (_dispNew) {
-                _dispNew = false;
-                // moveBlocking() nutzt eine eigene enge Timing-Schleife und ist
-                // unabhängig vom äußeren Loop-Takt. run() + loop() würde bei
-                // verzögerten loop()-Aufrufen (VL53L0X ~33 ms) Steps akkumulieren
-                // und dann als Burst feuern → Klopfen.
+                _dispNew  = false;
+                _countIR  = true;   // IR-Impulszählung während Stepper-Lauf
                 moveBlocking((int32_t)_dispGrams * _dispCfg->stepsPerGram, *_dispCfg);
+                _countIR  = false;
                 _dispNext(DS_STEPPER_WAIT);
             }
             break;

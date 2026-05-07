@@ -137,8 +137,6 @@ static void startFeed(uint16_t grams, uint8_t servo, const char *reason) {
     pendingEvent.servo    = servo;
     pendingEvent.distBefore = statusData.distMM;
     pendingEvent.fillBefore = statusData.fillPct;
-    pendingEvent.ir1Before  = statusData.ir1Analog;
-    pendingEvent.ir2Before  = statusData.ir2Analog;
     pendingEventValid = true;
 
     motors.dispense(grams, servo, cfg);
@@ -196,11 +194,10 @@ static void checkFeedComplete() {
         notifyEvent("Feeding completed");
 
         if (pendingEventValid) {
-            // Sensordaten nach Fütterung aus frisch aktualisiertem statusData
             pendingEvent.distAfter = statusData.distMM;
             pendingEvent.fillAfter = statusData.fillPct;
-            pendingEvent.ir1After  = statusData.ir1Analog;
-            pendingEvent.ir2After  = statusData.ir2Analog;
+            pendingEvent.ir1Pulses = motors.irCount1();
+            pendingEvent.ir2Pulses = motors.irCount2();
             feedLog.add(pendingEvent);
             pendingEventValid = false;
         }

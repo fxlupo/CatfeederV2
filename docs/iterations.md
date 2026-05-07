@@ -1,6 +1,53 @@
 # Iterationen
 
-## 2026-05-07 - Selbsttest, Fütterungsablauf und Blockierstrom-Konfiguration
+## 2026-05-07 - Nicht-blockierende Fütterungs-State-Machine (1.0.8)
+
+Scope:
+
+- Firmware-Version auf `1.0.8` gesetzt.
+- `Motors::dispense()` ist nicht mehr blockierend. Der gesamte Fütterungsablauf
+  läuft jetzt als State Machine in `Motors::loop()` über folgende Zustände:
+  `DS_SERVO_OPEN → DS_STEPPER → DS_STEPPER_WAIT → DS_SERVO_CLOSE
+  → DS_SHAKE_OPEN → DS_SHAKE_CLOSE → DS_DONE → DS_IDLE`
+- `motors.dispensing()` ersetzt den bisherigen `feedInProgress`-Flag in `main.cpp`.
+- `startFeed()` löst die Fütterung aus und kehrt sofort zurück.
+- `checkFeedComplete()` erkennt die Flanke `dispensing: true→false` und bucht
+  den Feed-Counter sowie das Notify-Event.
+- Scheduler und Web-Request-Handler prüfen `motors.dispensing()` statt einer
+  lokalen Variable.
+- `selfTest()` bleibt blockierend (läuft vor WLAN/Web-Start, kein Konflikt).
+- `motors.stop()` setzt `_dispState` auf `DS_IDLE` zurück.
+- Der ESP32 ist während einer Fütterung vollständig responsiv für Web-UI,
+  OTA und Sensor-Updates.
+
+Verifikation:
+
+- `pio run` erfolgreich für `esp32dev`.
+- RAM: 15.9 %, Flash: 75.0 %.
+
+## 2026-05-07 - OTA-Geschwindigkeit verbessert
+
+Scope:
+
+- I2C-Takt von 100 kHz auf 400 kHz erhöht (4× schnellere Sensor-Reads).
+- `otaActive`-Flag eingeführt: `loop()` bricht nach `ArduinoOTA.handle()`
+  sofort ab, solange ein OTA-Transfer läuft. VL53L0X-Blocking (~33–50 ms
+  alle 500 ms) blockiert damit den OTA-UDP-Handler nicht mehr.
+- RTC-Uhrzeit (`hour`, `minute`) wird in `sensors.update()` gecacht.
+  `sensors.hour()` und `sensors.minute()` lesen nur noch den Cache, kein
+  I2C-Read pro Loop-Durchlauf mehr.
+
+Ursachenanalyse:
+- VL53L0X `rangingTest()` im LONG_RANGE-Modus: synchron-blocking ~33–50 ms,
+  jede 500 ms → OTA-ACKs wurden verzögert.
+- `schedulerLoop()` rief `sensors.hour()` / `sensors.minute()` auf jedem
+  Loop-Durchlauf auf, je ~2 ms I2C @ 100 kHz → ~4 ms Blocking pro Tick.
+
+Verifikation:
+
+- `pio run` erfolgreich für `esp32dev` und `esp32dev_ota`.
+
+## 2026-05-07 - Selbsttest, Fütterungsablauf und Blockierstrom-Konfiguration (1.0.7)
 
 Scope:
 
@@ -23,7 +70,7 @@ Scope:
 
 Hinweis:
 - `stepperBlockMA` ist konfigurierbar und wird im NVS gespeichert.
-  Die aktive Auswertung (Stall-Stop) folgt mit der nicht-blockierenden State-Machine.
+  Die aktive Auswertung (Stall-Stop) folgt in einer späteren Iteration.
 
 Verifikation:
 

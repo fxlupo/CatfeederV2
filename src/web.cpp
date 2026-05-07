@@ -162,6 +162,13 @@ void Web::_routes() {
         d["bks"]=_c->blockReverseSteps;
         d["bkp"]=_c->blockMinRotPct;
         d["dfg"]=_c->defaultGrams;
+        JsonArray wa = d["wa"].to<JsonArray>();
+        for (int i = 0; i < WA_USERS; i++) {
+            JsonObject u = wa.add<JsonObject>();
+            u["on"] = _c->waUsers[i].active;
+            u["ph"] = _c->waUsers[i].phone;
+            u["ak"] = _c->waUsers[i].apikey;
+        }
         d["s1o"]=_c->s1Open; d["s1c"]=_c->s1Close;
         d["s2o"]=_c->s2Open; d["s2c"]=_c->s2Close;
         d["svs"]=_c->servoSpeedDPS;
@@ -200,6 +207,14 @@ void Web::_routes() {
         if (!doc["bks"].isNull()) _c->blockReverseSteps = constrain((uint16_t)doc["bks"], 50, 5000);
         if (!doc["bkp"].isNull()) _c->blockMinRotPct    = constrain((uint8_t)doc["bkp"],  5, 90);
         if (!doc["dfg"].isNull()) _c->defaultGrams      = constrain((uint16_t)doc["dfg"], 1, 500);
+        if (!doc["wa"].isNull()) {
+            JsonArray wa = doc["wa"];
+            for (int i = 0; i < min((int)wa.size(), WA_USERS); i++) {
+                _c->waUsers[i].active = wa[i]["on"] | false;
+                strlcpy(_c->waUsers[i].phone,  wa[i]["ph"] | "", sizeof(_c->waUsers[i].phone));
+                strlcpy(_c->waUsers[i].apikey, wa[i]["ak"] | "", sizeof(_c->waUsers[i].apikey));
+            }
+        }
         if (!doc["s1o"].isNull()) _c->s1Open   = doc["s1o"];
         if (!doc["s1c"].isNull()) _c->s1Close  = doc["s1c"];
         if (!doc["s2o"].isNull()) _c->s2Open   = doc["s2o"];

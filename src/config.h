@@ -6,8 +6,8 @@
 #include <Preferences.h>
 
 // ─── Firmware ───────────────────────────────────────────────────────────────
-#define FW_VERSION             "1.1.6"
-#define CONFIG_SCHEMA_VERSION  7
+#define FW_VERSION             "1.2.0"
+#define CONFIG_SCHEMA_VERSION  8
 
 // ─── WLAN ───────────────────────────────────────────────────────────────────
 #define WIFI_AP_SSID           "CatFeeder-Setup"
@@ -50,6 +50,9 @@
 #define BLOCK_DEFAULT_RETRIES        2 // Max. Wiederholversuche bei Blockade
 #define BLOCK_DEFAULT_REVERSE_STEPS 1000 // Rückwärts-Steps zur Freigabe
 #define BLOCK_DEFAULT_MIN_ROT_PCT    5 // Min. Rotation % pro 64-Schritt-Fenster
+
+// ─── Benachrichtigungen ─────────────────────────────────────────────────────
+#define WA_USERS               2       // Konfigurierbare WhatsApp-Empfänger
 
 // ─── Fütterung ──────────────────────────────────────────────────────────────
 #define MAX_SLOTS              4       // Fütterungszeiten pro Tag
@@ -112,6 +115,13 @@ struct Config {
     uint8_t  blockRetries;      // Max. Versuche nach Blockade
     uint16_t blockReverseSteps; // Rückwärts-Steps zur Freigabe
     uint8_t  blockMinRotPct;    // Min. Rotation % pro 64-Schritt-Fenster
+
+    // WhatsApp-Benachrichtigungen
+    struct WaUser {
+        bool active;
+        char phone[20];    // "+49176..."
+        char apikey[32];   // CallMeBot API-Key
+    } waUsers[WA_USERS];
 
     // Fütterung
     uint16_t defaultGrams;   // Standard-Menge für manuelles Füttern

@@ -56,6 +56,44 @@ Verifikation:
 - `pio run` erfolgreich für `esp32dev`.
 - RAM: 16.2 %, Flash: 77.3 %.
 
+## 2026-05-07 - WhatsApp-Benachrichtigung bei Blockade-Abbruch (1.2.0)
+
+Scope:
+
+- Firmware-Version auf `1.2.0` gesetzt.
+- Library: `hafidhh/Callmebot-ESP32` (GitHub) via HTTPS/HTTPClient.
+  Aufruf: `Callmebot.whatsappMessage(phone, apikey, message)`.
+
+**Funktionsweise:**
+- Bei Blockade-Abbruch (`motors.feedAborted() == true` in `checkFeedComplete()`)
+  wird `sendWhatsAppAlert()` aufgerufen.
+- Nachrichtentext (ASCII, kein Umlaut):
+  `"CatFeeder Blockade! Fuetterung (Xg) nach Y Versuch(en) abgebrochen. Bitte Futterzufuhr pruefen. [DD.MM.YYYY HH:MM:SS]"`
+- Gesendet wird an alle aktiven Nutzer mit ausgefüllter Telefonnummer und API-Key.
+- Bei AP-Modus (kein WLAN) wird kein Versand unternommen.
+
+**Konfiguration (2 Nutzer, NVS-persistent):**
+- `WaUser`: active (bool), phone[20] (+49...), apikey[32]
+- NVS-Keys: `w0a/w0p/w0k`, `w1a/w1p/w1k`
+- Web-UI: neuer Abschnitt "WhatsApp Benachrichtigungen" in Einstellungen,
+  je Nutzer: aktiv-Toggle, Telefonnummer, API-Key.
+- API: `wa`-Array in GET/POST `/api/config`.
+
+**CallMeBot-Registrierung:**
+1. WhatsApp-Nachricht an +34 644 59 16 58 senden: `I allow callmebot to send me messages`
+2. API-Key per Rückricht erhalten.
+3. Nummer und Key in der Web-UI eintragen.
+
+**Flash-Anmerkung:**
+- HTTPClient + WiFiClientSecure (gezogen durch CallMeBot-Library): +150 KB Flash.
+- Flash-Stand: 88.9 % (1165 KB / 1310 KB). Noch ~145 KB Headroom für OTA.
+- Keine weiteren großen Libraries mehr hinzufügen ohne vorher zu optimieren.
+
+Verifikation:
+
+- `pio run` erfolgreich für `esp32dev`.
+- RAM: 16.8 %, Flash: 88.9 %.
+
 ## 2026-05-07 - Blockadeerkennung: OR-Logik, Schwellen-Default, fillLow-Spam (1.1.6)
 
 Scope:

@@ -240,6 +240,12 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 <label style="display:flex;align-items:center;gap:8px;margin-top:6px">
 <label class="sw"><input type="checkbox" id="ds" checked><span></span></label>Sommerzeit</label></div>
 
+<div class="cd"><h3>&#x1F4AC; WhatsApp Benachrichtigungen</h3>
+<p style="font-size:.72em;color:var(--t2);margin-bottom:8px">CallMeBot-Dienst.
+Nummer auf <strong>api.callmebot.com</strong> registrieren und API-Key per WhatsApp anfordern.
+Aktuell: nur Benachrichtigung bei Blockade-Abbruch.</p>
+<div id="wac"></div></div>
+
 <div class="cd"><h3>&#x1F3F7; Hostname</h3>
 <label>mDNS-Name</label><input type="text" id="hn" value="catfeeder" maxlength="32"
   oninput="$('hp').textContent=this.value||'catfeeder'">
@@ -313,9 +319,36 @@ async function lc(){
   $('r2').value=C.s2o; $('r2v').textContent=C.s2o+'°';
   $('tz').value=C.tz;  $('ds').checked=C.dst;
   $('hn').value=C.hn;  $('hp').textContent=C.hn;
+  buildWA();
 }
 function tg(i,v){C.slots[i].on=v;$('s'+i).className='sl '+(v?'':'off');}
 function ut(i,v){const p=v.split(':');C.slots[i].h=+p[0];C.slots[i].m=+p[1];}
+
+// ── WhatsApp ──
+function buildWA(){
+  const el=$('wac'); if(!el||!C.wa)return;
+  el.innerHTML=C.wa.map((u,i)=>`
+    <div style="background:var(--c2);border-radius:8px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <label class="sw"><input type="checkbox" id="w${i}a" ${u.on?'checked':''}
+          onchange="C.wa[${i}].on=this.checked"><span></span></label>
+        <span style="font-size:.82em;font-weight:600">Nutzer ${i+1}</span>
+      </div>
+      <label>Telefon (+49...)</label>
+      <input type="text" id="w${i}p" value="${u.ph||''}" placeholder="+4917612345678" maxlength="19"
+        oninput="C.wa[${i}].ph=this.value">
+      <label>API Key</label>
+      <input type="text" id="w${i}k" value="${u.ak||''}" placeholder="CallMeBot API Key" maxlength="31"
+        oninput="C.wa[${i}].ak=this.value">
+    </div>`).join('');
+}
+function waToPayload(){
+  return (C.wa||[]).map((u,i)=>({
+    on:$('w'+i+'a').checked,
+    ph:$('w'+i+'p').value,
+    ak:$('w'+i+'k').value
+  }));
+}
 
 // ── Config speichern ──
 async function sav(){
@@ -329,6 +362,7 @@ async function sav(){
   C.feM=+$('ce').value; C.ffM=+$('cf').value;
   C.tz=+$('tz').value;  C.dst=$('ds').checked;
   C.hn=$('hn').value;
+  C.wa=waToPayload();
   const r=await api('/api/config',C);
   if(r&&r.ok)msg('Gespeichert ✓');}
 

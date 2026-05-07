@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <time.h>
+#include <Callmebot_ESP32.h>
 #include "config.h"
 #include "sensors.h"
 #include "motors.h"
@@ -38,6 +39,19 @@ static void notifyEvent(const __FlashStringHelper *event) {
 }
 static void notifyEvent(const char *event) {
     Serial.print(F("[Notify] ")); Serial.println(event);
+}
+
+// ─── WhatsApp Benachrichtigung ───────────────────────────────────────────────
+
+static void sendWhatsAppAlert(const char *msg) {
+    if (web.apMode()) return;
+    for (int i = 0; i < WA_USERS; i++) {
+        const Config::WaUser &u = cfg.waUsers[i];
+        if (!u.active || strlen(u.phone) == 0 || strlen(u.apikey) == 0) continue;
+        Serial.printf("[WA] Sende an %s...\n", u.phone);
+        Callmebot.whatsappMessage(u.phone, u.apikey, msg);
+        Serial.println(F("[WA] Gesendet"));
+    }
 }
 
 // ─── NTP ────────────────────────────────────────────────────────────────────
@@ -203,6 +217,13 @@ static void checkFeedComplete() {
             notifyEvent("Feeding completed");
         } else {
             notifyEvent("Feeding aborted - blockage!");
+            char waMsg[200];
+            snprintf(waMsg, sizeof(waMsg),
+                "CatFeeder Blockade! Fuetterung (%dg) nach %d Versuch(en) "
+                "abgebrochen. Bitte Futterzufuhr pruefen. [%s]",
+                pendingEvent.grams, motors.blockRetries(),
+                statusData.timeStr);
+            sendWhatsAppAlert(waMsg);
         }
 
         if (pendingEventValid) {

@@ -39,6 +39,11 @@ void CfgManager::defaults(Config &c) {
     c.fillEmptyMM      = FILL_EMPTY_MM;
     c.fillFullMM       = FILL_FULL_MM;
     c.irThreshold      = IR_THRESHOLD;
+    for (int i = 0; i < WA_USERS; i++) {
+        c.waUsers[i].active    = false;
+        c.waUsers[i].phone[0]  = '\0';
+        c.waUsers[i].apikey[0] = '\0';
+    }
     c.defaultGrams     = DEFAULT_FEED_GRAMS;
     c.utcOffset        = 1;
     c.dst              = true;
@@ -87,6 +92,12 @@ void CfgManager::save(const Config &c) {
     _p.putBool(  "dst", c.dst);
     _p.putString("hn",  c.hostname);
     _p.putUShort("dfg", c.defaultGrams);
+    for (int i = 0; i < WA_USERS; i++) {
+        char k[6];
+        sprintf(k, "w%da", i); _p.putBool(k,   c.waUsers[i].active);
+        sprintf(k, "w%dp", i); _p.putString(k,  c.waUsers[i].phone);
+        sprintf(k, "w%dk", i); _p.putString(k,  c.waUsers[i].apikey);
+    }
     Serial.println(F("[Cfg] Gespeichert"));
 }
 
@@ -141,6 +152,12 @@ void CfgManager::load(Config &c) {
     c.dst           = _p.getBool(  "dst", c.dst);
     { String s = _p.getString("hn", c.hostname); strlcpy(c.hostname, s.c_str(), sizeof(c.hostname)); }
     c.defaultGrams  = _p.getUShort("dfg", c.defaultGrams);
+    for (int i = 0; i < WA_USERS; i++) {
+        char k[6];
+        sprintf(k, "w%da", i); c.waUsers[i].active = _p.getBool(k, false);
+        sprintf(k, "w%dp", i); { String s = _p.getString(k, ""); strlcpy(c.waUsers[i].phone,  s.c_str(), sizeof(c.waUsers[i].phone)); }
+        sprintf(k, "w%dk", i); { String s = _p.getString(k, ""); strlcpy(c.waUsers[i].apikey, s.c_str(), sizeof(c.waUsers[i].apikey)); }
+    }
 
     // WLAN-Credentials aus lokalem Header falls leer
     if (strlen(c.ssid) == 0 && strlen(WIFI_DEFAULT_SSID) > 0) {

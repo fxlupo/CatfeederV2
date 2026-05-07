@@ -72,3 +72,28 @@ Neue Diagnosefelder:
 Verifikation:
 
 - `pio run` erfolgreich fuer `esp32dev` und `esp32dev_ota`.
+
+## 2026-05-07 - OTA-faehige Partitionstabelle
+
+Scope:
+
+- Ursache fuer haengende OTA-Uploads eingegrenzt: `huge_app.csv` ist fuer
+  ArduinoOTA ungeeignet, weil keine regulaeren OTA-App-Slots zur Verfuegung
+  stehen.
+- Partitionstabelle auf `default.csv` umgestellt.
+- Testversion auf `1.0.1-ota-test` gesetzt, damit ein erfolgreicher OTA-Test
+  eindeutig ueber `/api/diag` sichtbar ist.
+- OTA-Environment meldet dem ESP die Host-IP des Macs explizit mit
+  `-I 10.18.3.111`.
+- `default_envs = esp32dev` gesetzt, damit ein normales `pio run` nur das
+  USB-Environment baut.
+
+Wichtig:
+
+- Die geaenderte Partitionstabelle muss einmal per USB geflasht werden. Danach
+  koennen regulaere Firmware-Updates per OTA getestet werden.
+
+Verifikation:
+
+- `pio run` erfolgreich mit `default.csv`.
+- Firmwaregroesse: ca. 979 kB von 1.31 MB pro OTA-Slot.

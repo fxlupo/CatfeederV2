@@ -1,5 +1,34 @@
 # Iterationen
 
+## 2026-05-07 - Stepper-Klopfen durch Step-Bursts behoben (1.0.9)
+
+Scope:
+
+- Firmware-Version auf `1.0.9` gesetzt.
+- `DS_STEPPER`-State der Fütterungs-State-Machine nutzt jetzt `moveBlocking()`
+  statt `run()` + `loop()`.
+
+Ursache:
+- Der nicht-blockierende `run()` + `loop()`-Ansatz setzt voraus, dass
+  `motors.loop()` regelmäßig aufgerufen wird.
+- `sensors.update()` blockiert alle 500 ms für ~33–50 ms (VL53L0X `rangingTest()`
+  im LONG_RANGE-Modus ist synchron).
+- In dieser Zeit akkumulieren sich ~40 fällige Schritte (33 ms / 0,83 ms/Step
+  bei 1200 Steps/s). Beim nächsten `loop()`-Aufruf feuern diese als Burst →
+  Klopfen und unruhiger Lauf.
+
+Lösung:
+- `moveBlocking()` läuft in einer eigenen engen Timing-Schleife, vollständig
+  unabhängig vom äußeren Loop-Takt. Kein Akkumulieren, kein Burst.
+- `yield()` alle 64 Schritte hält den WiFi-Stack am Laufen.
+- Alle anderen State-Machine-States (Servo-Wartezeiten) bleiben nicht-blockierend.
+- Das ursprüngliche ruhige Stepper-Verhalten ist wiederhergestellt.
+
+Verifikation:
+
+- `pio run` erfolgreich für `esp32dev`.
+- RAM: 15.9 %, Flash: 75.0 %.
+
 ## 2026-05-07 - Nicht-blockierende Fütterungs-State-Machine (1.0.8)
 
 Scope:

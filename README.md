@@ -7,7 +7,7 @@ Scheduler, Sensor-Monitoring und vorbereiteten Benachrichtigungs-Hooks.
 
 - Zielplattform: ESP32
 - Buildsystem: PlatformIO / Arduino Framework
-- Firmware-Version: `1.0.8`
+- Firmware-Version: `1.0.9`
 - Web UI: lokal ueber HTTP, im Setup-Fall als Access Point
 - OTA: ArduinoOTA ueber WLAN/mDNS vorbereitet
 - Scheduler: bis zu 8 taegliche Fuetterungszeiten

@@ -185,10 +185,13 @@ void Motors::_dispenseLoop() {
         case DS_STEPPER:
             if (_dispNew) {
                 _dispNew = false;
-                configureStepper(*_dispCfg);
-                run((int32_t)_dispGrams * _dispCfg->stepsPerGram);
+                // moveBlocking() nutzt eine eigene enge Timing-Schleife und ist
+                // unabhängig vom äußeren Loop-Takt. run() + loop() würde bei
+                // verzögerten loop()-Aufrufen (VL53L0X ~33 ms) Steps akkumulieren
+                // und dann als Burst feuern → Klopfen.
+                moveBlocking((int32_t)_dispGrams * _dispCfg->stepsPerGram, *_dispCfg);
+                _dispNext(DS_STEPPER_WAIT);
             }
-            if (!running()) _dispNext(DS_STEPPER_WAIT);
             break;
 
         case DS_STEPPER_WAIT:

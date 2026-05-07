@@ -3,7 +3,9 @@
 // =============================================================================
 #include "motors.h"
 
-void Motors::begin(const Config &c) {
+void Motors::begin(const Config &c, Sensors &se) {
+    _sensors = &se;
+
     pinMode(PIN_STEP,   OUTPUT);
     pinMode(PIN_DIR,    OUTPUT);
     pinMode(PIN_EN_DRV, OUTPUT);
@@ -62,8 +64,8 @@ void Motors::stop() {
     drvEnable(false);
 }
 
-void Motors::moveBlocking(int32_t steps, const Config &c) {
-    if (steps == 0) return;
+bool Motors::moveBlocking(int32_t steps, const Config &c) {
+    if (steps == 0) return true;
 
     configureStepper(c);
     uint32_t periodUS = _ivlUS;
@@ -81,8 +83,11 @@ void Motors::moveBlocking(int32_t steps, const Config &c) {
                   (unsigned long)count, _dir > 0 ? "→" : "←",
                   (unsigned long)periodUS);
 
-    bool ir1Last = digitalRead(PIN_IR1_D0);
-    bool ir2Last = digitalRead(PIN_IR2_D0);
+    bool  ir1Last     = digitalRead(PIN_IR1_D0);
+    bool  ir2Last     = digitalRead(PIN_IR2_D0);
+    float prevAngle   = -1.0f;
+    uint8_t blockConsec = 0;
+    bool  blocked     = false;
 
     for (uint32_t i = 0; i < count; i++) {
         digitalWrite(PIN_STEP, HIGH);
@@ -90,21 +95,53 @@ void Motors::moveBlocking(int32_t steps, const Config &c) {
         digitalWrite(PIN_STEP, LOW);
         delayMicroseconds(lowUS);
         _pos += _dir;
+
         if ((i & 0x3F) == 0x3F) {
             yield();
+
+            // IR-Impulszählung
             if (_countIR) {
                 bool s1 = digitalRead(PIN_IR1_D0);
                 bool s2 = digitalRead(PIN_IR2_D0);
                 if (s1 != ir1Last) { _irCount1++; ir1Last = s1; }
                 if (s2 != ir2Last) { _irCount2++; ir2Last = s2; }
             }
+
+            // Blockadeerkennung: INA219 + AS5600
+            if (_blockDetect && _sensors) {
+                float curMA = 0.0f, angle = 0.0f;
+                _sensors->readInstant(curMA, angle);
+
+                bool curHigh = (curMA > (float)_blockMA);
+
+                bool rotLow = false;
+                if (prevAngle >= 0.0f && angle >= 0.0f) {
+                    float delta = angle - prevAngle;
+                    if (delta >  180.0f) delta -= 360.0f;
+                    if (delta < -180.0f) delta += 360.0f;
+                    rotLow = (fabsf(delta) < _blockMinAngle);
+                }
+                prevAngle = angle;
+
+                if (curHigh && rotLow) {
+                    if (++blockConsec >= 2) {
+                        Serial.printf("[Block] Strom=%.0fmA Rot<%.1f° → Blockade!\n",
+                                      curMA, _blockMinAngle);
+                        blocked = true;
+                        break;
+                    }
+                } else {
+                    blockConsec = 0;
+                }
+            }
         }
     }
 
-    if (_holdMS > 0) delay(_holdMS);
+    if (_holdMS > 0 && !blocked) delay(_holdMS);
     drvEnable(false);
     _remain = 0;
-    Serial.printf("[Step] Fertig @ pos %d\n", _pos);
+    if (!blocked) Serial.printf("[Step] Fertig @ pos %d\n", _pos);
+    return !blocked;
 }
 
 void Motors::_pulse() {
@@ -159,14 +196,20 @@ void Motors::selfTest(const Config &c) {
 // ═══════════════════════ Fütterungs-State-Machine ═══════════════════════════
 
 void Motors::dispense(uint16_t grams, uint8_t servo, const Config &c) {
-    if (_dispState != DS_IDLE) return;  // läuft noch
+    if (_dispState != DS_IDLE) return;
     Serial.printf("[Feed] start %dg servo=%d\n", grams, servo);
-    _dispGrams = grams;
-    _dispServo = servo;
-    _dispCfg   = &c;
-    _irCount1  = 0;
-    _irCount2  = 0;
-    _countIR   = false;   // wird in DS_STEPPER aktiviert
+    _dispGrams    = grams;
+    _dispServo    = servo;
+    _dispCfg      = &c;
+    _irCount1     = 0;
+    _irCount2     = 0;
+    _countIR      = false;
+    _dispRetries  = 0;
+    _feedAborted  = false;
+    // Blockade-Schwellen aus Config vorberechnen
+    _blockMA      = c.stepperBlockMA;
+    // NEMA17: 200 Steps/Rev, 1.8°/Step → 64 Steps = 115.2° erwartet
+    _blockMinAngle = (64.0f * 360.0f / STEPPER_STEPS_REV) * c.blockMinRotPct / 100.0f;
     _dispNext(DS_SERVO_OPEN);
 }
 
@@ -198,11 +241,19 @@ void Motors::_dispenseLoop() {
 
         case DS_STEPPER:
             if (_dispNew) {
-                _dispNew  = false;
-                _countIR  = true;   // IR-Impulszählung während Stepper-Lauf
-                moveBlocking((int32_t)_dispGrams * _dispCfg->stepsPerGram, *_dispCfg);
-                _countIR  = false;
-                _dispNext(DS_STEPPER_WAIT);
+                _dispNew     = false;
+                _countIR     = true;
+                _blockDetect = true;
+                bool ok = moveBlocking((int32_t)_dispGrams * _dispCfg->stepsPerGram, *_dispCfg);
+                _countIR     = false;
+                _blockDetect = false;
+                if (ok) {
+                    _dispNext(DS_STEPPER_WAIT);
+                } else {
+                    Serial.printf("[Feed] Blockade! Versuch %u/%u\n",
+                                  _dispRetries + 1, _dispCfg->blockRetries + 1);
+                    _dispNext(DS_BLOCK_REVERSE);
+                }
             }
             break;
 
@@ -228,8 +279,38 @@ void Motors::_dispenseLoop() {
 
         case DS_DONE:
             detachServos();
-            Serial.println(F("[Feed] Fertig"));
+            if (_feedAborted)
+                Serial.println(F("[Feed] Abgebrochen – maximale Versuche erreicht"));
+            else
+                Serial.println(F("[Feed] Fertig"));
             _dispState = DS_IDLE;
+            break;
+
+        // ── Blockade-Behandlung ──────────────────────────────────────────────
+
+        case DS_BLOCK_REVERSE:
+            if (_dispNew) {
+                _dispNew = false;
+                Serial.printf("[Feed] Reverse %u Steps\n", _dispCfg->blockReverseSteps);
+                moveBlocking(-(int32_t)_dispCfg->blockReverseSteps, *_dispCfg);
+                _dispTimer = millis();
+            }
+            if (millis() - _dispTimer >= 300) _dispNext(DS_BLOCK_RETRY);
+            break;
+
+        case DS_BLOCK_RETRY:
+            if (_dispNew) {
+                _dispNew = false;
+                _dispRetries++;
+                if (_dispRetries > _dispCfg->blockRetries) {
+                    _feedAborted = true;
+                    _dispNext(DS_DONE);
+                } else {
+                    Serial.printf("[Feed] Wiederholung %u/%u\n",
+                                  _dispRetries, _dispCfg->blockRetries + 1);
+                    _dispNext(DS_STEPPER);
+                }
+            }
             break;
     }
 }

@@ -1,5 +1,61 @@
 # Iterationen
 
+## 2026-05-07 - Blockadeerkennung mit Richtungsumkehr (1.1.4)
+
+Scope:
+
+- Firmware-Version auf `1.1.4` gesetzt, Config-Schema auf 7.
+
+**Erkennung:**
+- AS5600 (primär): Winkeldelta je 64-Schritt-Yield-Fenster (~53 ms bei 1200 Steps/s)
+  gegen Erwartungswert geprüft. NEMA17 direkt auf Stepper-Welle → 64 × 1,8° = 115,2°
+  erwartet. Bei `blockMinRotPct=30%` muss mindestens 34,6° Rotation sichtbar sein.
+- INA219 (sekundär): Strom > `stepperBlockMA` als Bestätigung.
+- Blockade gilt als erkannt wenn **beide** Kriterien in ≥ 2 aufeinanderfolgenden
+  Fenstern erfüllt sind (verhindert Falsch-Positive durch Einzelspikes).
+- Wrap-Around 359°→0° korrekt behandelt.
+
+**Reaktion (konfigurierbar):**
+```
+Blockade erkannt → Stop
+  → Rückwärts (blockReverseSteps Steps, Default 1000)
+  → 300 ms Pause
+  → Wiederholung (blockRetries mal, Default 2)
+  → Bei Überschreitung: Fütterung abgebrochen + Event-Log-Eintrag
+```
+
+**Neue Config-Felder (NVS-persistent):**
+- `blockRetries` (bkr): Max. Wiederholversuche, Default 2
+- `blockReverseSteps` (bks): Rückwärts-Steps, Default 1000
+- `blockMinRotPct` (bkp): Min. Rotation % pro Fenster, Default 30 %
+- `stepperBlockMA` bereits vorhanden, jetzt in eigenem UI-Abschnitt
+
+**Architektur:**
+- `Sensors::readInstant()` liest INA219 + AS5600 frisch (nicht gecacht) für
+  Erkennung während `moveBlocking()`.
+- `moveBlocking()` gibt jetzt `bool` zurück (true = OK, false = Blockade).
+- Neue State-Machine-States: `DS_BLOCK_REVERSE`, `DS_BLOCK_WAIT`, `DS_BLOCK_RETRY`.
+- `motors.begin()` nimmt jetzt `Sensors&` entgegen.
+- Blockade-Zählung nur aktiv wenn `_blockDetect = true` (nur in DS_STEPPER,
+  nicht beim Selbsttest oder Web-Testfahrt).
+
+**Web-UI:**
+- Neuer Abschnitt "Blockadeerkennung" in Kalibrierung.
+- Status-Tab: "Fütterung läuft" Banner (gelb) + "Blockade abgebrochen" Alert (rot).
+- Log-Tab: Badge "⚠ Blockade" (rot) oder "N× Retry" (gelb) pro Eintrag.
+- SSE: `fdi` (dispensing) + `fba` (feed aborted) live.
+
+Kalibrierung:
+- `stepperBlockMA` muss durch Testfütterungen ermittelt werden
+  (Soll zwischen normalem Laufstrom und Stallstrom liegen).
+- `blockMinRotPct=30%` ist ein konservativer Startwert; bei häufigen
+  Falsch-Positiven erhöhen, bei verpassten Blockaden verringern.
+
+Verifikation:
+
+- `pio run` erfolgreich für `esp32dev`.
+- RAM: 16.2 %, Flash: 77.3 %.
+
 ## 2026-05-07 - OTA-Stabilität: drei Ursachen behoben (1.1.3)
 
 Scope:

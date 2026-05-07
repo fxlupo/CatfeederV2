@@ -6,8 +6,8 @@
 #include <Preferences.h>
 
 // ─── Firmware ───────────────────────────────────────────────────────────────
-#define FW_VERSION             "1.1.3"
-#define CONFIG_SCHEMA_VERSION  6
+#define FW_VERSION             "1.1.4"
+#define CONFIG_SCHEMA_VERSION  7
 
 // ─── WLAN ───────────────────────────────────────────────────────────────────
 #define WIFI_AP_SSID           "CatFeeder-Setup"
@@ -46,7 +46,10 @@
 #define FILL_FULL_MM           10      // VL53L0X Abstand = Behälter voll
 #define IR_THRESHOLD           2048    // Analog-Schwelle IR
 #define INA_OVERCURRENT_MA     2000    // Überstrom-Grenze mA
-#define STEPPER_DEFAULT_BLOCK_MA 1500  // Blockierstrom-Schwelle mA (Stepper-Stall)
+#define STEPPER_DEFAULT_BLOCK_MA  1500 // Blockierstrom-Schwelle mA (Stepper-Stall)
+#define BLOCK_DEFAULT_RETRIES        2 // Max. Wiederholversuche bei Blockade
+#define BLOCK_DEFAULT_REVERSE_STEPS 1000 // Rückwärts-Steps zur Freigabe
+#define BLOCK_DEFAULT_MIN_ROT_PCT   30 // Min. Rotation % pro 64-Schritt-Fenster
 
 // ─── Fütterung ──────────────────────────────────────────────────────────────
 #define MAX_SLOTS              4       // Fütterungszeiten pro Tag
@@ -104,8 +107,11 @@ struct Config {
     uint16_t stepperDirSetupUS;
     uint16_t stepperHoldMS;
 
-    // Blockierschutz
-    uint16_t stepperBlockMA; // Strom-Schwelle für Stall-Erkennung (mA)
+    // Blockadeerkennung
+    uint16_t stepperBlockMA;    // Strom-Schwelle INA219 (mA)
+    uint8_t  blockRetries;      // Max. Versuche nach Blockade
+    uint16_t blockReverseSteps; // Rückwärts-Steps zur Freigabe
+    uint8_t  blockMinRotPct;    // Min. Rotation % pro 64-Schritt-Fenster
 
     // Fütterung
     uint16_t defaultGrams;   // Standard-Menge für manuelles Füttern
@@ -160,16 +166,18 @@ struct Status {
 // ═════════════════════════════════════════════════════════════════════════════
 
 struct FeedEvent {
-    char     timeStr[20];  // Zeitstempel beim Start "DD.MM.YYYY HH:MM:SS"
-    bool     isAuto;       // true = Zeitplan, false = manuell
+    char     timeStr[20];     // Zeitstempel beim Start "DD.MM.YYYY HH:MM:SS"
+    bool     isAuto;          // true = Zeitplan, false = manuell
     uint16_t grams;
     uint8_t  servo;
-    uint16_t distBefore;   // VL53L0X mm vor Fütterung
-    uint16_t distAfter;    // VL53L0X mm nach Fütterung
-    uint8_t  fillBefore;   // Füllstand % vor
-    uint8_t  fillAfter;    // Füllstand % nach
-    uint16_t ir1Pulses;    // Flanken-Impulse IR1 während Stepper-Lauf
-    uint16_t ir2Pulses;    // Flanken-Impulse IR2 während Stepper-Lauf
+    uint16_t distBefore;      // VL53L0X mm vor Fütterung
+    uint16_t distAfter;       // VL53L0X mm nach Fütterung
+    uint8_t  fillBefore;      // Füllstand % vor
+    uint8_t  fillAfter;       // Füllstand % nach
+    uint16_t ir1Pulses;       // Flanken-Impulse IR1 während Stepper-Lauf
+    uint16_t ir2Pulses;       // Flanken-Impulse IR2 während Stepper-Lauf
+    bool     feedAborted;     // Fütterung durch Blockade abgebrochen
+    uint8_t  blockRetryCount; // Anzahl Blockade-Versuche (0 = keine Blockade)
 };
 
 struct FeedLog {

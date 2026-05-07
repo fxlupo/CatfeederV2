@@ -27,8 +27,11 @@ void CfgManager::defaults(Config &c) {
     c.stepperInvertDir = false;
     c.stepperDirSetupUS= STEPPER_DEFAULT_DIR_SETUP_US;
     c.stepperHoldMS    = STEPPER_DEFAULT_HOLD_MS;
-    c.stepperBlockMA   = STEPPER_DEFAULT_BLOCK_MA;
-    c.s1Open           = SERVO_DEFAULT_OPEN;
+    c.stepperBlockMA    = STEPPER_DEFAULT_BLOCK_MA;
+    c.blockRetries      = BLOCK_DEFAULT_RETRIES;
+    c.blockReverseSteps = BLOCK_DEFAULT_REVERSE_STEPS;
+    c.blockMinRotPct    = BLOCK_DEFAULT_MIN_ROT_PCT;
+    c.s1Open            = SERVO_DEFAULT_OPEN;
     c.s1Close          = SERVO_DEFAULT_CLOSE;
     c.s2Open           = SERVO_DEFAULT_OPEN;
     c.s2Close          = SERVO_DEFAULT_CLOSE;
@@ -66,6 +69,9 @@ void CfgManager::save(const Config &c) {
     _p.putUShort("sds", c.stepperDirSetupUS);
     _p.putUShort("shm", c.stepperHoldMS);
     _p.putUShort("sbm", c.stepperBlockMA);
+    _p.putUChar( "bkr", c.blockRetries);
+    _p.putUShort("bks", c.blockReverseSteps);
+    _p.putUChar( "bkp", c.blockMinRotPct);
     // Servos – explizit benannte Keys, layout-unabhängig
     _p.putUChar( "s1o", c.s1Open);
     _p.putUChar( "s1c", c.s1Close);
@@ -117,6 +123,9 @@ void CfgManager::load(Config &c) {
     c.stepperDirSetupUS = _p.getUShort("sds", c.stepperDirSetupUS);
     c.stepperHoldMS     = _p.getUShort("shm", c.stepperHoldMS);
     c.stepperBlockMA    = _p.getUShort("sbm", c.stepperBlockMA);
+    c.blockRetries      = _p.getUChar( "bkr", c.blockRetries);
+    c.blockReverseSteps = _p.getUShort("bks", c.blockReverseSteps);
+    c.blockMinRotPct    = _p.getUChar( "bkp", c.blockMinRotPct);
     // Servos
     c.s1Open        = _p.getUChar( "s1o", c.s1Open);
     c.s1Close       = _p.getUChar( "s1c", c.s1Close);

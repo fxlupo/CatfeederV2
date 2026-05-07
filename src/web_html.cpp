@@ -106,6 +106,9 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 <!-- ══════════════ DASHBOARD ══════════════ -->
 <div id="da" class="pg on">
 
+<div id="fdi" style="display:none;background:var(--wn);color:#000;padding:8px 12px;border-radius:8px;text-align:center;font-weight:600;margin-bottom:10px">&#x23F3; Fütterung läuft…</div>
+<div id="fba" style="display:none;background:var(--er);color:#fff;padding:8px 12px;border-radius:8px;text-align:center;font-weight:600;margin-bottom:10px">&#x26A0; Fütterung durch Blockade abgebrochen!</div>
+
 <div class="cd"><h3>&#x1F35D; Fütterung</h3>
 <div class="g2">
 <div><label>Menge (g)</label><input type="number" id="fg" value="20" min="5" max="200" step="5"></div>
@@ -191,10 +194,18 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 <div><label>DIR-Setup (µs)</label><input type="number" id="sds" value="300" min="0" max="2000" step="50"></div>
 <div><label>Haltestrom (ms)</label><input type="number" id="shm" value="0" min="0" max="5000" step="100"></div>
 <div><label>Richtung invertieren</label><select id="sdi"><option value="0">Nein</option><option value="1">Ja</option></select></div>
-<div><label>Blockierstrom (mA)</label><input type="number" id="sbm" value="1500" min="100" max="5000" step="100"></div>
 <div style="display:flex;align-items:flex-end;gap:4px">
 <button class="bt b2 bs" onclick="tst(1)">&#x25B6; Vor</button>
 <button class="bt b2 bs" onclick="tst(-1)">&#x25C0; Zurück</button></div></div></div>
+
+<div class="cd"><h3>&#x1F6D1; Blockadeerkennung</h3>
+<p style="font-size:.72em;color:var(--t2);margin-bottom:8px">AS5600 (Rotation) + INA219 (Strom) kombiniert. Schwellen nach Testfütterungen kalibrieren.</p>
+<div class="g2">
+<div><label>Strom-Schwelle (mA)</label><input type="number" id="sbm" value="1500" min="100" max="5000" step="100"></div>
+<div><label>Min. Rotation (%)</label><input type="number" id="bkp" value="30" min="5" max="90" step="5"></div>
+<div><label>Rückwärts-Steps</label><input type="number" id="bks" value="1000" min="50" max="5000" step="50"></div>
+<div><label>Max. Versuche</label><input type="number" id="bkr" value="2" min="0" max="10" step="1"></div>
+</div></div>
 
 <div class="cd"><h3>&#x2696; Futter</h3>
 <label>Steps pro Gramm</label>
@@ -293,7 +304,9 @@ async function lc(){
   $('dfg').value=C.dfg||20;
   $('cg').value=C.spg; $('cs').value=C.spd;
   $('spu').value=C.spu||10; $('sds').value=C.sds??300; $('shm').value=C.shm??0;
-  $('sdi').value=C.sdi?1:0; $('sbm').value=C.sbm||1500;
+  $('sdi').value=C.sdi?1:0;
+  $('sbm').value=C.sbm||1500; $('bkp').value=C.bkp||30;
+  $('bks').value=C.bks||1000; $('bkr').value=C.bkr??2;
   $('ss').value=C.svs||1000;
   $('ce').value=C.feM; $('cf').value=C.ffM;
   $('r1').value=C.s1o; $('r1v').textContent=C.s1o+'°';
@@ -309,7 +322,9 @@ async function sav(){
   C.dfg=+$('dfg').value;
   C.spg=+$('cg').value; C.spd=+$('cs').value;
   C.spu=+$('spu').value; C.sds=+$('sds').value; C.shm=+$('shm').value;
-  C.sdi=$('sdi').value==='1'; C.sbm=+$('sbm').value;
+  C.sdi=$('sdi').value==='1';
+  C.sbm=+$('sbm').value; C.bkp=+$('bkp').value;
+  C.bks=+$('bks').value; C.bkr=+$('bkr').value;
   C.svs=+$('ss').value;
   C.feM=+$('ce').value; C.ffM=+$('cf').value;
   C.tz=+$('tz').value;  C.dst=$('ds').checked;
@@ -345,9 +360,13 @@ async function loadLog(){
   const sv=['Beide','S1','S2'];
   el.innerHTML=d.events.map(e=>`
     <div style="background:var(--c2);border-radius:8px;padding:10px;margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:4px">
         <span style="font-size:.8em;font-weight:600">${e.t}</span>
-        <span class="badge ${e.a?'ba':'bm'}">${e.a?'Auto':'Manuell'}</span>
+        <span style="display:flex;gap:4px">
+          <span class="badge ${e.a?'ba':'bm'}">${e.a?'Auto':'Manuell'}</span>
+          ${e.abt?'<span class="badge" style="background:var(--er);color:#fff">&#x26A0; Blockade</span>':''}
+          ${e.bkn>0&&!e.abt?`<span class="badge" style="background:var(--wn);color:#000">${e.bkn}× Retry</span>`:''}
+        </span>
       </div>
       <div class="g2" style="gap:4px">
         <div class="st"><div class="v">${e.g}g</div><div class="l">${sv[e.sv]||'?'}</div></div>
@@ -365,6 +384,8 @@ function sse(){
   es.addEventListener('s',e=>{
     const d=JSON.parse(e.data);
     if(d.fw)$('fw').textContent=d.fw;
+    $('fdi').style.display=d.fdi?'block':'none';
+    $('fba').style.display=d.fba?'block':'none';
     $('ht').textContent=d.t||'--:--:--';
     $('fp').textContent=d.fl+'%'; $('fm').textContent=d.mm+' mm';
     $('fb').style.width=d.fl+'%';

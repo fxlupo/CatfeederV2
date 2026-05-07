@@ -63,6 +63,8 @@ void Web::_sendSSE() {
     if (_sse.count() == 0) return;
     JsonDocument d;
     d["fw"]  = FW_VERSION;
+    d["fdi"] = _mo->dispensing();
+    d["fba"] = _mo->feedAborted();
     d["v"]   = _st->busV;
     d["ma"]  = _st->currentMA;
     d["mw"]  = _st->powerMW;
@@ -156,6 +158,9 @@ void Web::_routes() {
         d["spu"]=_c->stepperPulseUS; d["sdi"]=_c->stepperInvertDir;
         d["sds"]=_c->stepperDirSetupUS; d["shm"]=_c->stepperHoldMS;
         d["sbm"]=_c->stepperBlockMA;
+        d["bkr"]=_c->blockRetries;
+        d["bks"]=_c->blockReverseSteps;
+        d["bkp"]=_c->blockMinRotPct;
         d["dfg"]=_c->defaultGrams;
         d["s1o"]=_c->s1Open; d["s1c"]=_c->s1Close;
         d["s2o"]=_c->s2Open; d["s2c"]=_c->s2Close;
@@ -190,8 +195,11 @@ void Web::_routes() {
         if (!doc["sdi"].isNull()) _c->stepperInvertDir = doc["sdi"];
         if (!doc["sds"].isNull()) _c->stepperDirSetupUS = constrain((uint16_t)doc["sds"], 0, 2000);
         if (!doc["shm"].isNull()) _c->stepperHoldMS = constrain((uint16_t)doc["shm"], 0, 5000);
-        if (!doc["sbm"].isNull()) _c->stepperBlockMA = constrain((uint16_t)doc["sbm"], 100, 5000);
-        if (!doc["dfg"].isNull()) _c->defaultGrams   = constrain((uint16_t)doc["dfg"], 1, 500);
+        if (!doc["sbm"].isNull()) _c->stepperBlockMA    = constrain((uint16_t)doc["sbm"], 100, 5000);
+        if (!doc["bkr"].isNull()) _c->blockRetries      = constrain((uint8_t)doc["bkr"],  0, 10);
+        if (!doc["bks"].isNull()) _c->blockReverseSteps = constrain((uint16_t)doc["bks"], 50, 5000);
+        if (!doc["bkp"].isNull()) _c->blockMinRotPct    = constrain((uint8_t)doc["bkp"],  5, 90);
+        if (!doc["dfg"].isNull()) _c->defaultGrams      = constrain((uint16_t)doc["dfg"], 1, 500);
         if (!doc["s1o"].isNull()) _c->s1Open   = doc["s1o"];
         if (!doc["s1c"].isNull()) _c->s1Close  = doc["s1c"];
         if (!doc["s2o"].isNull()) _c->s2Open   = doc["s2o"];
@@ -285,8 +293,9 @@ void Web::_routes() {
             o["sv"]  = e.servo;
             o["db"]  = e.distBefore; o["da"]  = e.distAfter;
             o["fb"]  = e.fillBefore; o["fa"]  = e.fillAfter;
-            o["i1p"] = e.ir1Pulses;
-            o["i2p"] = e.ir2Pulses;
+            o["i1p"] = e.ir1Pulses;  o["i2p"] = e.ir2Pulses;
+            o["abt"] = e.feedAborted;
+            o["bkn"] = e.blockRetryCount;
         }
         String j; serializeJson(d, j);
         r->send(200, "application/json", j);

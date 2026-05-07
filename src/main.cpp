@@ -192,15 +192,21 @@ static void handleWebFeedRequest() {
 static void checkFeedComplete() {
     bool nowDispensing = motors.dispensing();
     if (wasDispensing && !nowDispensing) {
-        statusData.feeds++;
-        cfgMgr.saveFeedCount(statusData.feeds);
-        notifyEvent("Feeding completed");
+        if (!motors.feedAborted()) {
+            statusData.feeds++;
+            cfgMgr.saveFeedCount(statusData.feeds);
+            notifyEvent("Feeding completed");
+        } else {
+            notifyEvent("Feeding aborted - blockage!");
+        }
 
         if (pendingEventValid) {
-            pendingEvent.distAfter = statusData.distMM;
-            pendingEvent.fillAfter = statusData.fillPct;
-            pendingEvent.ir1Pulses = motors.irCount1();
-            pendingEvent.ir2Pulses = motors.irCount2();
+            pendingEvent.distAfter      = statusData.distMM;
+            pendingEvent.fillAfter      = statusData.fillPct;
+            pendingEvent.ir1Pulses      = motors.irCount1();
+            pendingEvent.ir2Pulses      = motors.irCount2();
+            pendingEvent.feedAborted    = motors.feedAborted();
+            pendingEvent.blockRetryCount= motors.blockRetries();
             feedLog.add(pendingEvent);
             pendingEventValid = false;
         }
@@ -223,7 +229,7 @@ void setup() {
     statusData.feeds = cfgMgr.loadFeedCount();
 
     sensors.begin();
-    motors.begin(cfg);
+    motors.begin(cfg, sensors);
     motors.selfTest(cfg);
     refreshStatus();
 

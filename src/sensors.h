@@ -15,8 +15,9 @@
 class Sensors {
 public:
     void begin();
-    void update();                                // Alle Sensoren lesen
+    void update();                                // Alle Sensoren lesen (gecacht)
     void fillStatus(Status &st, const Config &c); // Status-Struct befüllen
+    void readInstant(float &currentMA, float &angleDeg); // Frisch für Blockadeerkennung
 
     // RTC
     String   timeString();

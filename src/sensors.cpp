@@ -98,6 +98,11 @@ void Sensors::update() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+void Sensors::readInstant(float &currentMA, float &angleDeg) {
+    currentMA = ok_ina ? _ina.getCurrent_mA() : 0.0f;
+    angleDeg  = ok_as  ? _as.getRawAngle() * (360.0f / 4096.0f) : -1.0f;
+}
+
 void Sensors::fillStatus(Status &st, const Config &c) {
     st.busV      = _busV;
     st.currentMA = _curMA;

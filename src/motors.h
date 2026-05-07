@@ -44,6 +44,9 @@ private:
     uint32_t _ivlUS   = 1666;     // µs zwischen Steps
     uint32_t _lastUS  = 0;
     bool     _enabled = false;
+    int16_t  _sv1Pos  = -1;
+    int16_t  _sv2Pos  = -1;
 
     void _pulse();
+    void _writeServo(Servo &servo, int16_t &current, uint8_t pin, uint8_t deg, const Config &c);
 };

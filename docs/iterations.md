@@ -112,3 +112,28 @@ Verifikation:
 
 - `/api/diag` zeigte `otaReady: true` und `fw: 1.0.1-ota-test` nach USB-Flash.
 - OTA-Upload ueber `esp32dev_ota` lief erfolgreich durch.
+
+## 2026-05-07 - Hardware-Pins und Servo-Kalibrierung bereinigt
+
+Scope:
+
+- Nicht verbaute Endschalter aus aktiver Firmware, Statusdaten, SSE und WebUI
+  entfernt.
+- Pinmap auf aktuelle Hardware angepasst:
+  - VL53L0X XSHUT: GPIO 16
+  - IR1 D0/A0: GPIO 39 / GPIO 36
+  - IR2 D0/A0: GPIO 35 / GPIO 34
+- Servo-Geschwindigkeit als `servoSpeedDPS` in die Konfiguration aufgenommen.
+- WebUI-Kalibrierung erweitert:
+  - Servo 1/2 Winkel per Slider testen
+  - aktuelle Sliderposition als Offen/Zu speichern
+  - gespeicherte Offen/Zu-Endlagen fahren
+  - Servo-Geschwindigkeit in Grad/s speichern
+- Servo-Open/Close-Fahrten nutzen jetzt weiche Positionsschritte anhand der
+  konfigurierten Geschwindigkeit.
+- Firmware-Version auf `1.0.2` gesetzt.
+
+Verifikation:
+
+- `pio run` erfolgreich fuer `esp32dev`.
+- `pio run -e esp32dev_ota` erfolgreich.

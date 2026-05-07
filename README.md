@@ -11,7 +11,7 @@ Scheduler, Sensor-Monitoring und vorbereiteten Benachrichtigungs-Hooks.
 - Web UI: lokal ueber HTTP, im Setup-Fall als Access Point
 - OTA: ArduinoOTA ueber WLAN/mDNS vorbereitet
 - Scheduler: bis zu 8 taegliche Fuetterungszeiten
-- Monitoring: Sensorstatus, Strom, Fuellstand, Endschalter, IR, Uptime, Heap
+- Monitoring: Sensorstatus, Strom, Fuellstand, IR, Uptime, Heap
 
 ## Projektstruktur
 
@@ -26,7 +26,7 @@ catfeeder/
 │   ├── main.cpp          # App-Orchestrierung, OTA, Scheduler, Monitoring
 │   ├── pins.h            # GPIO-Definitionen
 │   ├── config.h/.cpp     # Konfiguration, NVS, Defaultwerte
-│   ├── sensors.h/.cpp    # INA219, VL53L0X, AS5600, DS3231, IR, Endschalter
+│   ├── sensors.h/.cpp    # INA219, VL53L0X, AS5600, DS3231, IR
 │   ├── motors.h/.cpp     # Stepper + Servos + Fuetterungsablauf
 │   ├── web.h/.cpp        # WLAN, Webserver, REST-API, SSE
 │   └── web_html.cpp      # Eingebettetes Webinterface
@@ -73,7 +73,7 @@ Tabs:
 
 - Status: Live-Dashboard, Sofort-Fuettern, Sensoren, Fuellstand, Strom, System
 - Zeiten: bis zu 8 taegliche Fuetterungszeiten
-- Kalibrierung: Servo-Winkel, Stepper-Test, Steps pro Gramm, Fuellstandsgrenzen
+- Kalibrierung: Servo-Winkel, Servo-Geschwindigkeit, Stepper-Test, Steps pro Gramm, Fuellstandsgrenzen
 - Einstellungen: WLAN, RTC-Sync, Zeitzone, Hostname, Werksreset
 
 ## REST API
@@ -85,7 +85,7 @@ Tabs:
 | `GET` | `/api/config` | Konfiguration lesen |
 | `POST` | `/api/config` | Konfiguration speichern |
 | `POST` | `/api/feed` | Sofort-Fuetterung anfordern |
-| `POST` | `/api/sv` | Servo-Testwinkel setzen |
+| `POST` | `/api/sv` | Servo-Testwinkel setzen oder gespeicherte Endlage fahren |
 | `POST` | `/api/stp` | Stepper-Test starten |
 | `POST` | `/api/time` | RTC synchronisieren |
 | `POST` | `/api/wifi` | WLAN speichern und neu starten |
@@ -103,15 +103,11 @@ Tabs:
 | 27 | EN_DRV | LOW = aktiv |
 | 18 | SERVO1 | PWM |
 | 19 | SERVO2 | PWM |
-| 32 | S1_OPEN | INPUT_PULLUP, LOW = ausgelöst |
-| 33 | S1_CLOSE | INPUT_PULLUP, LOW = ausgelöst |
-| 13 | S2_OPEN | INPUT_PULLUP, LOW = ausgelöst |
-| 14 | S2_CLOSE | INPUT_PULLUP, LOW = ausgelöst |
-| 34 | IR1_A0 | Analog, input-only |
-| 35 | IR2_A0 | Analog, input-only |
-| 2 | IR1_D0 | Digital |
-| 4 | IR2_D0 | Digital |
-| 5 | VL53_XSHUT | LOW = Standby |
+| 39 | IR1_D0 | Digital, input-only |
+| 36 | IR1_A0 | Analog ADC1, input-only |
+| 35 | IR2_D0 | Digital, input-only |
+| 34 | IR2_A0 | Analog ADC1, input-only |
+| 16 | VL53_XSHUT | LOW = Standby |
 
 I2C-Geraete:
 

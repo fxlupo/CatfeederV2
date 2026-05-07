@@ -22,6 +22,7 @@ void CfgManager::defaults(Config &c) {
     c.s1Close      = SERVO_DEFAULT_CLOSE;
     c.s2Open       = SERVO_DEFAULT_OPEN;
     c.s2Close      = SERVO_DEFAULT_CLOSE;
+    c.servoSpeedDPS= SERVO_DEFAULT_SPEED_DPS;
     c.fillEmptyMM  = FILL_EMPTY_MM;
     c.fillFullMM   = FILL_FULL_MM;
     c.irThreshold  = IR_THRESHOLD;

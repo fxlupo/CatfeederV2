@@ -48,16 +48,10 @@ void Sensors::begin() {
         Serial.println(F("[Sensor] DS3231  ✗"));
     }
 
-    // ── Endschalter ─────────────────────────────────────────────────────────
-    pinMode(PIN_S1_OPEN,  INPUT_PULLUP);
-    pinMode(PIN_S1_CLOSE, INPUT_PULLUP);
-    pinMode(PIN_S2_OPEN,  INPUT_PULLUP);
-    pinMode(PIN_S2_CLOSE, INPUT_PULLUP);
-
     // ── IR Sensoren ─────────────────────────────────────────────────────────
-    // Analog: GPIO34, GPIO35 (Input-Only, kein Pullup)
+    // Analog: GPIO36, GPIO34 (Input-Only, kein Pullup)
     analogSetAttenuation(ADC_11db);
-    // Digital: GPIO2, GPIO4
+    // Digital: GPIO39, GPIO35 (Input-Only)
     pinMode(PIN_IR1_D0, INPUT);
     pinMode(PIN_IR2_D0, INPUT);
 
@@ -120,12 +114,6 @@ void Sensors::fillStatus(Status &st, const Config &c) {
     } else {
         st.fillPct = 0;
     }
-
-    // Endschalter
-    st.s1Open  = s1Open();
-    st.s1Close = s1Close();
-    st.s2Open  = s2Open();
-    st.s2Close = s2Close();
 
     // Health
     st.ok_ina = ok_ina;

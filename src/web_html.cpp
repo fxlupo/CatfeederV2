@@ -120,13 +120,6 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 <div class="sr"><span>DS3231 RTC</span><span id="lr"></span></div>
 <div class="sr"><span>Encoder</span><span id="ae">--°</span></div></div>
 
-<div class="cd"><h3>&#x1F50C; Endschalter</h3>
-<div class="g2">
-<div class="sr"><span>S1 Offen</span><span id="e1o"></span></div>
-<div class="sr"><span>S1 Zu</span><span id="e1c"></span></div>
-<div class="sr"><span>S2 Offen</span><span id="e2o"></span></div>
-<div class="sr"><span>S2 Zu</span><span id="e2c"></span></div></div></div>
-
 <div class="cd"><h3>&#x1F4A1; IR Sensoren</h3>
 <div class="g2">
 <div class="st"><div class="v" id="i1a">--</div><div class="l">IR1 Analog</div></div>
@@ -157,7 +150,9 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 <span class="rv" id="r1v">90°</span><span>180°</span></div>
 <div class="g2" style="margin-top:6px">
 <button class="bt b2 bs" onclick="cso(1)">&#x1F4CC; = Offen</button>
-<button class="bt b2 bs" onclick="csc(1)">&#x1F4CC; = Zu</button></div></div>
+<button class="bt b2 bs" onclick="csc(1)">&#x1F4CC; = Zu</button>
+<button class="bt b2 bs" onclick="svcmd(1,'open')">&#x25B6; Offen fahren</button>
+<button class="bt b2 bs" onclick="svcmd(1,'close')">&#x25C0; Zu fahren</button></div></div>
 
 <div class="cd"><h3>&#x1F504; Servo 2</h3>
 <div class="rw"><span>0°</span>
@@ -166,7 +161,13 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 <span class="rv" id="r2v">90°</span><span>180°</span></div>
 <div class="g2" style="margin-top:6px">
 <button class="bt b2 bs" onclick="cso(2)">&#x1F4CC; = Offen</button>
-<button class="bt b2 bs" onclick="csc(2)">&#x1F4CC; = Zu</button></div></div>
+<button class="bt b2 bs" onclick="csc(2)">&#x1F4CC; = Zu</button>
+<button class="bt b2 bs" onclick="svcmd(2,'open')">&#x25B6; Offen fahren</button>
+<button class="bt b2 bs" onclick="svcmd(2,'close')">&#x25C0; Zu fahren</button></div></div>
+
+<div class="cd"><h3>&#x1F3CE; Servo-Geschwindigkeit</h3>
+<label>Grad pro Sekunde</label>
+<input type="number" id="ss" value="180" min="20" max="720" step="10"></div>
 
 <div class="cd"><h3>&#x2699; Stepper</h3>
 <div class="g2">
@@ -256,6 +257,7 @@ async function lc(){
         <option value="1"${s.sv==1?' selected':''}>S1</option>
         <option value="2"${s.sv==2?' selected':''}>S2</option></select></div>`;}
   $('cg').value=C.spg; $('cs').value=C.spd;
+  $('ss').value=C.svs||180;
   $('ce').value=C.feM; $('cf').value=C.ffM;
   $('r1').value=C.s1o; $('r1v').textContent=C.s1o+'°';
   $('r2').value=C.s2o; $('r2v').textContent=C.s2o+'°';
@@ -268,6 +270,7 @@ function ut(i,v){const p=v.split(':');C.slots[i].h=+p[0];C.slots[i].m=+p[1];}
 // ── Config speichern ──
 async function sav(){
   C.spg=+$('cg').value; C.spd=+$('cs').value;
+  C.svs=+$('ss').value;
   C.feM=+$('ce').value; C.ffM=+$('cf').value;
   C.tz=+$('tz').value;  C.dst=$('ds').checked;
   C.hn=$('hn').value;
@@ -280,6 +283,7 @@ async function feed(){msg('Fütterung …');
 function tsv(n,a){api('/api/sv',{n,a});}
 function cso(n){C['s'+n+'o']=+$('r'+n).value;msg('Servo '+n+' Offen = '+$('r'+n).value+'°');}
 function csc(n){C['s'+n+'c']=+$('r'+n).value;msg('Servo '+n+' Zu = '+$('r'+n).value+'°');}
+async function svcmd(n,cmd){await sav();await api('/api/sv',{n,cmd});msg('Servo '+n+' '+cmd);}
 async function tst(d){const s=+$('ts').value*d;await api('/api/stp',{s});msg(s+' Steps');}
 async function syn(){const n=new Date();
   await api('/api/time',{y:n.getFullYear(),mo:n.getMonth()+1,d:n.getDate(),
@@ -304,8 +308,6 @@ function sse(){
     if($('cd'))$('cd').textContent=d.mm+' mm';
     const er=d.er||{};
     led('li',!er.i); led('lv',!er.v); led('la',!er.a); led('lr',!er.r);
-    const sw=d.sw||{};
-    led('e1o',sw['1o']); led('e1c',sw['1c']); led('e2o',sw['2o']); led('e2c',sw['2c']);
     const ir=d.ir||{};
     $('i1a').textContent=ir.a1||0; $('i2a').textContent=ir.a2||0;
     $('i1d').textContent=ir.d1?'HIGH':'LOW'; $('i2d').textContent=ir.d2?'HIGH':'LOW';

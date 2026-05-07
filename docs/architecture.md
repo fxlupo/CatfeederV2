@@ -5,8 +5,8 @@
 - `main.cpp`: Initialisiert Konfiguration, Sensoren, Motoren, Webserver und OTA.
   Fuehrt ausserdem Web-Fuetterungsanforderungen, Scheduler und Monitoring aus.
 - `config.*`: Persistente Konfiguration im ESP32-NVS ueber `Preferences`.
-- `sensors.*`: Gekapselter Zugriff auf INA219, VL53L0X, AS5600, DS3231,
-  IR-Sensoren und Endschalter.
+- `sensors.*`: Gekapselter Zugriff auf INA219, VL53L0X, AS5600, DS3231 und
+  IR-Sensoren.
 - `motors.*`: Stepper-Laufsteuerung, Servo-Positionen und blockierender
   Fuetterungsablauf.
 - `web.*`: WLAN/AP-Fallback, mDNS, REST-API, SSE-Liveupdates.

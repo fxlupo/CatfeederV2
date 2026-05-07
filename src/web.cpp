@@ -79,10 +79,6 @@ void Web::_sendSSE() {
     ir["a1"] = _st->ir1Analog;  ir["a2"] = _st->ir2Analog;
     ir["d1"] = _st->ir1Digital; ir["d2"] = _st->ir2Digital;
 
-    JsonObject sw = d["sw"].to<JsonObject>();
-    sw["1o"] = _st->s1Open;  sw["1c"] = _st->s1Close;
-    sw["2o"] = _st->s2Open;  sw["2c"] = _st->s2Close;
-
     JsonObject er = d["er"].to<JsonObject>();
     er["i"] = !_st->ok_ina; er["v"] = !_st->ok_vl;
     er["a"] = !_st->ok_as;  er["r"] = !_st->ok_rtc;
@@ -151,6 +147,7 @@ void Web::_routes() {
         d["spg"]=_c->stepsPerGram; d["spd"]=_c->stepperSpeed;
         d["s1o"]=_c->s1Open; d["s1c"]=_c->s1Close;
         d["s2o"]=_c->s2Open; d["s2c"]=_c->s2Close;
+        d["svs"]=_c->servoSpeedDPS;
         d["feM"]=_c->fillEmptyMM; d["ffM"]=_c->fillFullMM;
         d["irt"]=_c->irThreshold;
         d["tz"]=_c->utcOffset; d["dst"]=_c->dst;
@@ -181,6 +178,7 @@ void Web::_routes() {
         if (!doc["s1c"].isNull()) _c->s1Close  = doc["s1c"];
         if (!doc["s2o"].isNull()) _c->s2Open   = doc["s2o"];
         if (!doc["s2c"].isNull()) _c->s2Close  = doc["s2c"];
+        if (!doc["svs"].isNull()) _c->servoSpeedDPS = constrain((uint16_t)doc["svs"], 20, 720);
         if (!doc["feM"].isNull()) _c->fillEmptyMM = doc["feM"];
         if (!doc["ffM"].isNull()) _c->fillFullMM  = doc["ffM"];
         if (!doc["irt"].isNull()) _c->irThreshold  = doc["irt"];
@@ -207,7 +205,15 @@ void Web::_routes() {
     _srv.on("/api/sv", HTTP_POST, bodyHandler, NULL,
         [this](AsyncWebServerRequest *r, uint8_t *d, size_t l, size_t, size_t) {
         JsonDocument doc; deserializeJson(doc, d, l);
-        _mo->setAngle(doc["n"]|1, doc["a"]|90);
+        uint8_t n = doc["n"] | 1;
+        const char *cmd = doc["cmd"] | "";
+        if (strcmp(cmd, "open") == 0) {
+            if (n == 1) _mo->s1Open(*_c); else _mo->s2Open(*_c);
+        } else if (strcmp(cmd, "close") == 0) {
+            if (n == 1) _mo->s1Close(*_c); else _mo->s2Close(*_c);
+        } else {
+            _mo->setAngle(n, doc["a"] | 90);
+        }
         r->send(200, "application/json", "{\"ok\":1}");
     });
 

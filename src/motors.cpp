@@ -112,34 +112,56 @@ void Motors::dispense(uint16_t grams, uint8_t servo, const Config &c) {
 
 // ═══════════════════════ Servos ═════════════════════════════════════════════
 
+void Motors::_writeServo(Servo &servo, int16_t &current, uint8_t pin, uint8_t deg, const Config &c) {
+    deg = constrain(deg, 0, 180);
+    servo.attach(pin, SERVO_MIN_US, SERVO_MAX_US);
+
+    if (current < 0) {
+        servo.write(deg);
+        current = deg;
+        return;
+    }
+
+    uint16_t speed = c.servoSpeedDPS > 0 ? c.servoSpeedDPS : SERVO_DEFAULT_SPEED_DPS;
+    uint16_t delayMs = 1000UL / speed;
+    if (delayMs < 5) delayMs = 5;
+    int8_t step = deg >= current ? 1 : -1;
+
+    while (current != deg) {
+        current += step;
+        servo.write(current);
+        delay(delayMs);
+        yield();
+    }
+}
+
 void Motors::s1Open(const Config &c) {
-    _sv1.attach(PIN_SERVO1, SERVO_MIN_US, SERVO_MAX_US);
-    _sv1.write(c.s1Open);
+    _writeServo(_sv1, _sv1Pos, PIN_SERVO1, c.s1Open, c);
     Serial.printf("[Sv1] open → %d°\n", c.s1Open);
 }
 void Motors::s1Close(const Config &c) {
-    _sv1.attach(PIN_SERVO1, SERVO_MIN_US, SERVO_MAX_US);
-    _sv1.write(c.s1Close);
+    _writeServo(_sv1, _sv1Pos, PIN_SERVO1, c.s1Close, c);
     Serial.printf("[Sv1] close → %d°\n", c.s1Close);
 }
 void Motors::s2Open(const Config &c) {
-    _sv2.attach(PIN_SERVO2, SERVO_MIN_US, SERVO_MAX_US);
-    _sv2.write(c.s2Open);
+    _writeServo(_sv2, _sv2Pos, PIN_SERVO2, c.s2Open, c);
     Serial.printf("[Sv2] open → %d°\n", c.s2Open);
 }
 void Motors::s2Close(const Config &c) {
-    _sv2.attach(PIN_SERVO2, SERVO_MIN_US, SERVO_MAX_US);
-    _sv2.write(c.s2Close);
+    _writeServo(_sv2, _sv2Pos, PIN_SERVO2, c.s2Close, c);
     Serial.printf("[Sv2] close → %d°\n", c.s2Close);
 }
 
 void Motors::setAngle(uint8_t num, uint8_t deg) {
+    deg = constrain(deg, 0, 180);
     if (num == 1) {
         _sv1.attach(PIN_SERVO1, SERVO_MIN_US, SERVO_MAX_US);
         _sv1.write(deg);
+        _sv1Pos = deg;
     } else {
         _sv2.attach(PIN_SERVO2, SERVO_MIN_US, SERVO_MAX_US);
         _sv2.write(deg);
+        _sv2Pos = deg;
     }
 }
 

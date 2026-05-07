@@ -18,20 +18,14 @@
 #define PIN_SERVO1           18
 #define PIN_SERVO2           19
 
-// ─── Endschalter (INPUT_PULLUP, LOW = ausgelöst) ───────────────────────────
-#define PIN_S1_OPEN          32
-#define PIN_S1_CLOSE         33
-#define PIN_S2_OPEN          13
-#define PIN_S2_CLOSE         14
-
 // ─── IR Sensoren ────────────────────────────────────────────────────────────
-#define PIN_IR1_A0           34   // Analog (Input-Only)
-#define PIN_IR2_A0           35   // Analog (Input-Only)
-#define PIN_IR1_D0            2   // Digital
-#define PIN_IR2_D0            4   // Digital
+#define PIN_IR1_D0           39   // Digital (Input-Only)
+#define PIN_IR1_A0           36   // Analog ADC1 (Input-Only / VP)
+#define PIN_IR2_D0           35   // Digital (Input-Only)
+#define PIN_IR2_A0           34   // Analog ADC1 (Input-Only)
 
 // ─── VL53L0X ────────────────────────────────────────────────────────────────
-#define PIN_VL53_XSHUT        5   // XSHUT (LOW = Standby, HIGH = aktiv)
+#define PIN_VL53_XSHUT       16   // XSHUT (LOW = Standby, HIGH = aktiv)
 
 // ─── I2C-Adressen ───────────────────────────────────────────────────────────
 #define I2C_ADDR_INA219    0x40
@@ -43,8 +37,7 @@
 // GPIO  0  – bootkritisch (Strapping-Pin)
 // GPIO 12  – bootkritisch (Strapping-Pin)
 // GPIO 15  – bootkritisch (Strapping-Pin)
-// GPIO 16  – frei
 // GPIO 17  – frei
 // GPIO 23  – frei
-// GPIO 36  – frei (Input-Only / VP)
-// GPIO 39  – frei (Input-Only / VN)
+// GPIO 32  – frei
+// GPIO 33  – frei

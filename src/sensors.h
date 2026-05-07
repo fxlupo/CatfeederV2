@@ -1,6 +1,6 @@
 // =============================================================================
 // CatFeeder ESP32 – Sensor-Manager
-// INA219 · VL53L0X · AS5600 · DS3231 · IR (2×analog + 2×digital) · Endschalter
+// INA219 · VL53L0X · AS5600 · DS3231 · IR (2×analog + 2×digital)
 // =============================================================================
 #pragma once
 #include <Arduino.h>
@@ -24,12 +24,6 @@ public:
     uint8_t  minute();
     bool     setTime(uint16_t y, uint8_t mo, uint8_t d,
                      uint8_t h, uint8_t mi, uint8_t s);
-
-    // Endschalter
-    bool s1Open()  { return !digitalRead(PIN_S1_OPEN); }
-    bool s1Close() { return !digitalRead(PIN_S1_CLOSE); }
-    bool s2Open()  { return !digitalRead(PIN_S2_OPEN); }
-    bool s2Close() { return !digitalRead(PIN_S2_CLOSE); }
 
     // Health-Flags
     bool ok_ina  = false;

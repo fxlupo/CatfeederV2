@@ -6,7 +6,7 @@
 #include <Preferences.h>
 
 // ─── Firmware ───────────────────────────────────────────────────────────────
-#define FW_VERSION             "1.0.1"
+#define FW_VERSION             "1.0.2"
 
 // ─── WLAN ───────────────────────────────────────────────────────────────────
 #define WIFI_AP_SSID           "CatFeeder-Setup"
@@ -35,6 +35,7 @@
 #define SERVO_MAX_US           2500
 #define SERVO_DEFAULT_OPEN     90
 #define SERVO_DEFAULT_CLOSE    0
+#define SERVO_DEFAULT_SPEED_DPS 180    // Grad/s für weiche Positionsfahrt
 
 // ─── Sensoren ───────────────────────────────────────────────────────────────
 #define FILL_EMPTY_MM          300     // VL53L0X Abstand = Behälter leer
@@ -76,6 +77,7 @@ struct Config {
     uint8_t  s1Close;
     uint8_t  s2Open;
     uint8_t  s2Close;
+    uint16_t servoSpeedDPS;  // Grad pro Sekunde
 
     // VL53L0X
     uint16_t fillEmptyMM;
@@ -108,12 +110,6 @@ struct Status {
     uint16_t ir2Analog;
     bool     ir1Digital;
     bool     ir2Digital;
-
-    // Endschalter
-    bool     s1Open;
-    bool     s1Close;
-    bool     s2Open;
-    bool     s2Close;
 
     // Sensor-Health
     bool     ok_ina;

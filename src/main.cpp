@@ -19,7 +19,8 @@ Web web;
 static uint8_t lastMinute = 255;
 static bool dayResetDone = false;
 static bool feedInProgress = false;
-static bool otaReady = false;
+static bool otaReady      = false;
+static bool otaActive     = false;
 static const uint16_t OTA_PORT = 3232;
 
 static void setOtaPhase(const char *phase) {
@@ -45,12 +46,14 @@ static void beginOTA() {
     ArduinoOTA.setPort(OTA_PORT);
 
     ArduinoOTA.onStart([]() {
+        otaActive = true;
         setOtaPhase("start");
         notifyEvent(F("OTA start"));
         motors.stop();
         motors.detachServos();
     });
     ArduinoOTA.onEnd([]() {
+        otaActive = false;
         setOtaPhase("complete");
         notifyEvent(F("OTA complete"));
     });
@@ -178,6 +181,7 @@ void setup() {
 
 void loop() {
     ArduinoOTA.handle();
+    if (otaActive) return;   // während OTA: kein Sensor-Blocking, kein SSE
     motors.loop();
     refreshStatus();
     web.loop();

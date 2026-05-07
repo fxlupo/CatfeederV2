@@ -6,7 +6,7 @@
 void Sensors::begin() {
     // ── I2C ─────────────────────────────────────────────────────────────────
     Wire.begin(PIN_SDA, PIN_SCL);
-    Wire.setClock(100000);
+    Wire.setClock(400000);
 
     // ── VL53L0X: XSHUT steuern ─────────────────────────────────────────────
     pinMode(PIN_VL53_XSHUT, OUTPUT);
@@ -83,6 +83,13 @@ void Sensors::update() {
     if (ok_as)
         _angle = _as.getRawAngle() * (360.0f / 4096.0f);
 
+    // DS3231 – gecachte Uhrzeit für Scheduler (kein extra I2C-Read pro Loop)
+    if (ok_rtc) {
+        DateTime now = _rtc.now();
+        _hour   = now.hour();
+        _minute = now.minute();
+    }
+
     // IR Analog + Digital
     _ir1a = analogRead(PIN_IR1_A0);
     _ir2a = analogRead(PIN_IR2_A0);
@@ -137,15 +144,8 @@ void Sensors::fillStatus(Status &st, const Config &c) {
 // RTC (DS3231)
 // ═════════════════════════════════════════════════════════════════════════════
 
-uint8_t Sensors::hour() {
-    if (!ok_rtc) return 0;
-    return _rtc.now().hour();
-}
-
-uint8_t Sensors::minute() {
-    if (!ok_rtc) return 0;
-    return _rtc.now().minute();
-}
+uint8_t Sensors::hour()   { return _hour; }
+uint8_t Sensors::minute() { return _minute; }
 
 String Sensors::timeString() {
     if (!ok_rtc) return String("--:--:--");

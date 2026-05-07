@@ -49,5 +49,7 @@ private:
     bool     _ir2d      = false;
 
     uint32_t _lastRead  = 0;
+    uint8_t  _hour      = 0;
+    uint8_t  _minute    = 0;
     static constexpr uint32_t READ_INTERVAL = 500; // ms
 };

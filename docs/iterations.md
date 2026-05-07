@@ -97,3 +97,18 @@ Verifikation:
 
 - `pio run` erfolgreich mit `default.csv`.
 - Firmwaregroesse: ca. 979 kB von 1.31 MB pro OTA-Slot.
+
+## 2026-05-07 - OTA validiert
+
+Scope:
+
+- OTA nach USB-Flash der OTA-faehigen Partitionstabelle erfolgreich getestet.
+- Testversion `1.0.1-ota-test` wieder auf saubere Firmware-Version `1.0.1`
+  gesetzt.
+- Feste Mac-Host-IP aus dem OTA-Environment entfernt, damit das Projekt nicht
+  an einen konkreten Entwicklungsrechner gebunden ist.
+
+Verifikation:
+
+- `/api/diag` zeigte `otaReady: true` und `fw: 1.0.1-ota-test` nach USB-Flash.
+- OTA-Upload ueber `esp32dev_ota` lief erfolgreich durch.

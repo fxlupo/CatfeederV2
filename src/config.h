@@ -13,6 +13,18 @@
 #define WIFI_AP_PASS           "katze1234"
 #define WIFI_CONNECT_TIMEOUT   15000   // ms
 
+#if __has_include("wifi_credentials.h")
+#include "wifi_credentials.h"
+#endif
+
+#ifndef WIFI_DEFAULT_SSID
+#define WIFI_DEFAULT_SSID      ""
+#endif
+
+#ifndef WIFI_DEFAULT_PASS
+#define WIFI_DEFAULT_PASS      ""
+#endif
+
 // ─── Stepper ────────────────────────────────────────────────────────────────
 #define STEPPER_STEPS_REV      200     // NEMA17 Standard (1,8° / Schritt)
 #define STEPPER_DEFAULT_SPEED  600     // Steps/s

@@ -25,3 +25,23 @@ Naechste sinnvolle Schritte:
 - OTA optional auch als Browser-Upload anbieten.
 - Benachrichtigungskanal konkret festlegen und implementieren.
 - Git initialisieren, initial commit erstellen und nach GitHub pushen.
+
+## 2026-05-07 - Lokale WLAN-Defaults fuer OTA-Test vorbereitet
+
+Scope:
+
+- `upload_port` und `monitor_port` auf `/dev/cu.wchusbserial110` gesetzt.
+- Optionalen lokalen Header `src/wifi_credentials.h` eingefuehrt.
+- `src/wifi_credentials.h` wird von Git ignoriert, damit echte WLAN-Daten nicht
+  im Repository landen.
+- `src/wifi_credentials.example.h` als Vorlage angelegt.
+- Config-Defaults uebernehmen lokale WLAN-Daten beim ersten Start.
+- Wenn im NVS eine leere SSID liegt, werden die lokalen WLAN-Defaults nachtraeglich
+  uebernommen und gespeichert.
+
+Verifikation:
+
+- `pio run` erfolgreich.
+- USB-Upload versucht, aber `/dev/cu.wchusbserial110` war auf dem Mac nicht
+  vorhanden. Sichtbare Ports: `/dev/cu.Bluetooth-Incoming-Port`,
+  `/dev/cu.debug-console`.

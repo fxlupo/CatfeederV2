@@ -27,7 +27,9 @@ void CfgManager::defaults(Config &c) {
     c.irThreshold  = IR_THRESHOLD;
     c.utcOffset    = 1;          // MEZ
     c.dst          = true;
-    strncpy(c.hostname, "catfeeder", sizeof(c.hostname));
+    strlcpy(c.ssid, WIFI_DEFAULT_SSID, sizeof(c.ssid));
+    strlcpy(c.pass, WIFI_DEFAULT_PASS, sizeof(c.pass));
+    strlcpy(c.hostname, "catfeeder", sizeof(c.hostname));
 }
 
 void CfgManager::save(const Config &c) {
@@ -42,6 +44,12 @@ void CfgManager::load(Config &c) {
         save(c);
     } else {
         Serial.println(F("[Cfg] Geladen"));
+        if (strlen(c.ssid) == 0 && strlen(WIFI_DEFAULT_SSID) > 0) {
+            strlcpy(c.ssid, WIFI_DEFAULT_SSID, sizeof(c.ssid));
+            strlcpy(c.pass, WIFI_DEFAULT_PASS, sizeof(c.pass));
+            save(c);
+            Serial.println(F("[Cfg] WLAN-Defaults übernommen"));
+        }
     }
 }
 

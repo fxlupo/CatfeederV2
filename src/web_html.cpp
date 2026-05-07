@@ -3,11 +3,16 @@
 // =============================================================================
 #include "web.h"
 
-// Das gesamte HTML/CSS/JS liegt in PROGMEM, um RAM zu sparen.
 static const char INDEX_HTML[] PROGMEM = R"rawhtml(
 <!DOCTYPE html><html lang="de"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="CatFeeder">
+<meta name="theme-color" content="#e8564a">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon.svg">
+<link rel="manifest" href="/manifest.json">
 <title>CatFeeder</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -24,8 +29,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
 .fw{position:absolute;right:12px;top:10px;font-weight:700}
 nav{display:flex;background:var(--c1);position:sticky;top:48px;z-index:99;
     border-bottom:1px solid rgba(255,255,255,.06);overflow-x:auto}
-nav button{flex:1;padding:10px 6px;background:none;border:none;color:var(--t2);
-           font-size:.72em;font-weight:600;cursor:pointer;min-width:65px;
+nav button{flex:1;padding:10px 4px;background:none;border:none;color:var(--t2);
+           font-size:.68em;font-weight:600;cursor:pointer;min-width:58px;
            border-bottom:2px solid transparent;transition:.2s}
 nav button.on{color:var(--ac);border-bottom-color:var(--ac)}
 .pg{display:none;padding:10px 10px 20px}
@@ -74,6 +79,9 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 .rw{display:flex;align-items:center;gap:6px}
 .rw input[type=range]{flex:1;accent-color:var(--ac)}
 .rw .rv{min-width:32px;text-align:center;font-weight:600;font-size:.85em}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:.7em;font-weight:600}
+.ba{background:var(--ac2);color:#fff}
+.bm{background:var(--ac);color:#fff}
 .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
        padding:10px 22px;border-radius:8px;font-size:.82em;font-weight:600;
        z-index:1000;opacity:0;transition:opacity .25s;pointer-events:none;color:#fff}
@@ -82,7 +90,7 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 @media(max-width:380px){.g2{grid-template-columns:1fr}.g3{grid-template-columns:1fr 1fr}}
 </style></head><body>
 
-<div class="hd"><h1>&#x1F431; CatFeeder</h1>
+<div class="hd"><h1>&#x1F43E; CatFeeder</h1>
 <small id="fw" class="fw">--</small>
 <small id="ht">--:--:--</small> &middot; <small id="hi"></small></div>
 
@@ -91,6 +99,7 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 <button onclick="pg('sc',this)">&#x23F0; Zeiten</button>
 <button onclick="pg('ca',this)">&#x1F527; Kalibr.</button>
 <button onclick="pg('se',this)">&#x2699; Einst.</button>
+<button onclick="pg('lg',this)">&#x1F4CB; Log</button>
 </nav>
 
 <!-- ══════════════ DASHBOARD ══════════════ -->
@@ -98,11 +107,11 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 
 <div class="cd"><h3>&#x1F35D; Fütterung</h3>
 <div class="g2">
-<div><label>Menge (g)</label><input type="number" id="fg" value="20" min="5" max="100" step="5"></div>
+<div><label>Menge (g)</label><input type="number" id="fg" value="20" min="5" max="200" step="5"></div>
 <div><label>Auslass</label><select id="fs">
 <option value="0">Beide</option><option value="1">Servo 1</option><option value="2">Servo 2</option></select></div>
 </div>
-<button class="bt b1" onclick="feed()" style="margin-top:10px">&#x1F431; Jetzt füttern!</button></div>
+<button class="bt b1" onclick="feed()" style="margin-top:10px">&#x1F43E; Jetzt füttern!</button></div>
 
 <div class="cd"><h3>&#x1F4E6; Füllstand</h3>
 <div class="bar"><div class="f" id="fb" style="width:0%"></div></div>
@@ -138,7 +147,7 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 <!-- ══════════════ FÜTTERUNGSZEITEN ══════════════ -->
 <div id="sc" class="pg">
 <div class="cd"><h3>&#x23F0; Fütterungsplan</h3>
-<p style="font-size:.72em;color:var(--t2);margin-bottom:8px">Bis zu 8 Zeiten. Aktiv = wird täglich ausgeführt.</p>
+<p style="font-size:.72em;color:var(--t2);margin-bottom:8px">Bis zu 4 Zeiten. Aktiv = wird täglich ausgeführt.</p>
 <div id="slc"></div>
 <button class="bt b1" onclick="sav()" style="margin-top:10px">&#x1F4BE; Speichern</button></div></div>
 
@@ -198,6 +207,11 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 <!-- ══════════════ EINSTELLUNGEN ══════════════ -->
 <div id="se" class="pg">
 
+<div class="cd"><h3>&#x1F35D; Standard-Fütterung</h3>
+<label>Standardmenge (g)</label>
+<input type="number" id="dfg" value="20" min="5" max="200" step="5">
+<p style="font-size:.72em;color:var(--t2);margin-top:4px">Vorbelegung des Mengenfeldes im Status-Tab</p></div>
+
 <div class="cd"><h3>&#x1F4F6; WLAN</h3>
 <label>SSID</label><input type="text" id="ws" placeholder="Netzwerkname">
 <label>Passwort</label><input type="password" id="wp" placeholder="WLAN-Passwort">
@@ -224,6 +238,14 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 <p style="font-size:.75em;color:var(--t2);margin-bottom:8px">Setzt alles auf Standardwerte zurück.</p>
 <button class="bt b3" onclick="if(confirm('Wirklich zurücksetzen?'))rst()">&#x1F5D1; Reset</button></div></div>
 
+<!-- ══════════════ EVENT LOG ══════════════ -->
+<div id="lg" class="pg">
+<div class="cd">
+<h3>&#x1F4CB; Fütterungsprotokoll</h3>
+<p style="font-size:.72em;color:var(--t2);margin-bottom:8px">Letzte 20 Fütterungen (RAM, geht bei Neustart verloren).</p>
+<div id="lge"></div>
+</div></div>
+
 <div class="toast" id="tt"></div>
 
 <script>
@@ -235,6 +257,7 @@ function pg(id,btn){
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));
   $(id).classList.add('on'); btn.classList.add('on');
+  if(id==='lg') loadLog();
 }
 
 // ── Toast ──
@@ -256,13 +279,15 @@ async function lc(){
     c.innerHTML+=`<div class="sl ${s.on?'':'off'}" id="s${i}">
       <label class="sw"><input type="checkbox" ${s.on?'checked':''} onchange="tg(${i},this.checked)"><span></span></label>
       <input type="time" value="${h}:${m}" onchange="ut(${i},this.value)">
-      <input type="number" value="${s.g}" min="5" max="100" step="5" onchange="C.slots[${i}].g=+this.value">
+      <input type="number" value="${s.g}" min="5" max="200" step="5" onchange="C.slots[${i}].g=+this.value">
       <span style="font-size:.7em;color:var(--t2)">g</span>
       <select onchange="C.slots[${i}].sv=+this.value">
         <option value="0"${s.sv==0?' selected':''}>Beide</option>
         <option value="1"${s.sv==1?' selected':''}>S1</option>
         <option value="2"${s.sv==2?' selected':''}>S2</option></select></div>`;}
   $('fw').textContent=C.fw||'--';
+  $('fg').value=C.dfg||20;
+  $('dfg').value=C.dfg||20;
   $('cg').value=C.spg; $('cs').value=C.spd;
   $('spu').value=C.spu||10; $('sds').value=C.sds??300; $('shm').value=C.shm??0;
   $('sdi').value=C.sdi?1:0; $('sbm').value=C.sbm||1500;
@@ -278,6 +303,7 @@ function ut(i,v){const p=v.split(':');C.slots[i].h=+p[0];C.slots[i].m=+p[1];}
 
 // ── Config speichern ──
 async function sav(){
+  C.dfg=+$('dfg').value;
   C.spg=+$('cg').value; C.spd=+$('cs').value;
   C.spu=+$('spu').value; C.sds=+$('sds').value; C.shm=+$('shm').value;
   C.sdi=$('sdi').value==='1'; C.sbm=+$('sbm').value;
@@ -303,6 +329,31 @@ async function swf(){const ss=$('ws').value;if(!ss){msg('SSID eingeben!',1);retu
   if(!confirm('WLAN ändern & neu starten?'))return;
   await api('/api/wifi',{ssid:ss,pw:$('wp').value});msg('Neustart…');}
 async function rst(){await api('/api/reset',{});msg('Reset…');}
+
+// ── Event-Log ──
+async function loadLog(){
+  const el=$('lge');
+  el.innerHTML='<p style="color:var(--t2);padding:8px 0">Lade…</p>';
+  const d=await api('/api/log');
+  if(!d){el.innerHTML='<p style="color:var(--er);padding:8px 0">Fehler</p>';return;}
+  if(!d.events||d.events.length===0){
+    el.innerHTML='<p style="color:var(--t2);padding:8px 0">Noch keine Einträge.</p>';
+    return;}
+  const sv=['Beide','S1','S2'];
+  el.innerHTML=d.events.map(e=>`
+    <div style="background:var(--c2);border-radius:8px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:.8em;font-weight:600">${e.t}</span>
+        <span class="badge ${e.a?'ba':'bm'}">${e.a?'Auto':'Manuell'}</span>
+      </div>
+      <div class="g2" style="gap:4px">
+        <div class="st"><div class="v">${e.g}g</div><div class="l">${sv[e.sv]||'?'}</div></div>
+        <div class="st"><div class="v">${e.fb}%&rarr;${e.fa}%</div><div class="l">Füllstand</div></div>
+        <div class="st"><div class="v">${e.db}&rarr;${e.da}</div><div class="l">VL53 mm</div></div>
+        <div class="st"><div class="v">${e.i1b}/${e.i2b}</div><div class="l">IR vor</div></div>
+      </div>
+    </div>`).join('');
+}
 
 // ── SSE ──
 function sse(){

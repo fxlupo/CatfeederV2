@@ -31,6 +31,7 @@ void CfgManager::defaults(Config &c) {
     c.fillFullMM   = FILL_FULL_MM;
     c.irThreshold  = IR_THRESHOLD;
     c.stepperBlockMA = STEPPER_DEFAULT_BLOCK_MA;
+    c.defaultGrams   = DEFAULT_FEED_GRAMS;
     c.utcOffset    = 1;          // MEZ
     c.dst          = true;
     strlcpy(c.ssid, WIFI_DEFAULT_SSID, sizeof(c.ssid));
@@ -82,6 +83,10 @@ void CfgManager::load(Config &c) {
         }
         if (c.stepperBlockMA < 100 || c.stepperBlockMA > 5000) {
             c.stepperBlockMA = STEPPER_DEFAULT_BLOCK_MA;
+            migrated = true;
+        }
+        if (c.defaultGrams < 1 || c.defaultGrams > 500) {
+            c.defaultGrams = DEFAULT_FEED_GRAMS;
             migrated = true;
         }
 

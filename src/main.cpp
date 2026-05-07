@@ -1,45 +1,67 @@
 // =============================================================================
 // CatFeeder ESP32 - Main Firmware
-// Web UI, OTA, scheduler, monitoring and feeding orchestration.
+// Web UI, OTA, NTP, scheduler, monitoring and feeding orchestration.
 // =============================================================================
 #include <Arduino.h>
 #include <ArduinoOTA.h>
+#include <time.h>
 #include "config.h"
 #include "sensors.h"
 #include "motors.h"
 #include "web.h"
 
 CfgManager cfgMgr;
-Config cfg;
-Status statusData;
-Sensors sensors;
-Motors motors;
-Web web;
+Config     cfg;
+Status     statusData;
+Sensors    sensors;
+Motors     motors;
+Web        web;
+FeedLog    feedLog;
 
-static uint8_t lastMinute   = 255;
-static bool    dayResetDone = false;
-static bool    otaReady     = false;
-static bool    otaActive    = false;
-static bool    wasDispensing= false;   // Flanken-Erkennung Fütterungsende
+static uint8_t lastMinute      = 255;
+static bool    dayResetDone    = false;
+static bool    otaReady        = false;
+static bool    otaActive       = false;
+static bool    wasDispensing   = false;
+static bool    pendingEventValid = false;
+static FeedEvent pendingEvent;
 static const uint16_t OTA_PORT = 3232;
 
 static void setOtaPhase(const char *phase) {
     strlcpy(statusData.otaPhase, phase, sizeof(statusData.otaPhase));
 }
-
 static void setOtaError(const char *error) {
     strlcpy(statusData.lastOtaError, error, sizeof(statusData.lastOtaError));
 }
-
 static void notifyEvent(const __FlashStringHelper *event) {
-    Serial.print(F("[Notify] "));
-    Serial.println(event);
+    Serial.print(F("[Notify] ")); Serial.println(event);
+}
+static void notifyEvent(const char *event) {
+    Serial.print(F("[Notify] ")); Serial.println(event);
 }
 
-static void notifyEvent(const char *event) {
-    Serial.print(F("[Notify] "));
-    Serial.println(event);
+// ─── NTP ────────────────────────────────────────────────────────────────────
+
+static void syncNTP() {
+    if (web.apMode()) return;
+    long offset = ((long)cfg.utcOffset + (cfg.dst ? 1 : 0)) * 3600L;
+    configTime(offset, 0, "pool.ntp.org", "time.nist.gov");
+    Serial.print(F("[NTP] Sync"));
+    struct tm ti;
+    uint32_t t0 = millis();
+    while (!getLocalTime(&ti, 200) && millis() - t0 < 8000) {
+        Serial.print('.');
+    }
+    if (getLocalTime(&ti, 200)) {
+        sensors.setTime(ti.tm_year + 1900, ti.tm_mon + 1, ti.tm_mday,
+                        ti.tm_hour, ti.tm_min, ti.tm_sec);
+        Serial.printf(" %02d:%02d:%02d OK\n", ti.tm_hour, ti.tm_min, ti.tm_sec);
+    } else {
+        Serial.println(F(" Timeout"));
+    }
 }
+
+// ─── OTA ────────────────────────────────────────────────────────────────────
 
 static void beginOTA() {
     ArduinoOTA.setHostname(cfg.hostname);
@@ -58,8 +80,7 @@ static void beginOTA() {
         notifyEvent(F("OTA complete"));
     });
     ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        uint8_t pct = total > 0 ? (progress * 100U / total) : 0;
-        Serial.printf("[OTA] progress=%u%%\n", pct);
+        Serial.printf("[OTA] %u%%\n", total > 0 ? progress * 100U / total : 0);
     });
     ArduinoOTA.onError([](ota_error_t error) {
         setOtaPhase("error");
@@ -71,7 +92,6 @@ static void beginOTA() {
             case OTA_END_ERROR:     setOtaError("end");     break;
             default:                setOtaError("unknown"); break;
         }
-        Serial.printf("[OTA] error=%u\n", error);
     });
 
     setOtaPhase("ready");
@@ -80,6 +100,8 @@ static void beginOTA() {
     otaReady = true;
     Serial.printf("[OTA] Ready as %s.local:%u\n", cfg.hostname, OTA_PORT);
 }
+
+// ─── Status ─────────────────────────────────────────────────────────────────
 
 static void refreshStatus() {
     sensors.update();
@@ -90,21 +112,35 @@ static void refreshStatus() {
     statusData.otaReady = otaReady;
     statusData.otaPort  = OTA_PORT;
     statusData.wifiRSSI = WiFi.isConnected() ? WiFi.RSSI() : 0;
-    strlcpy(statusData.ip,       web.ip().c_str(),              sizeof(statusData.ip));
-    strlcpy(statusData.hostname, cfg.hostname,                  sizeof(statusData.hostname));
-    strlcpy(statusData.wifiMode, web.apMode() ? "AP" : "STA",  sizeof(statusData.wifiMode));
+    strlcpy(statusData.ip,       web.ip().c_str(),             sizeof(statusData.ip));
+    strlcpy(statusData.hostname, cfg.hostname,                 sizeof(statusData.hostname));
+    strlcpy(statusData.wifiMode, web.apMode() ? "AP" : "STA", sizeof(statusData.wifiMode));
 
     if (statusData.overcurrent) notifyEvent(F("Overcurrent detected"));
     if (statusData.fillLow)     notifyEvent(F("Fill level low"));
 }
 
-// Fütterung starten – kehrt sofort zurück, State Machine läuft in loop()
+// ─── Fütterung ──────────────────────────────────────────────────────────────
+
 static void startFeed(uint16_t grams, uint8_t servo, const char *reason) {
     if (motors.dispensing()) {
         Serial.println(F("[Feed] ignored: already running"));
         return;
     }
     Serial.printf("[Feed] reason=%s grams=%u servo=%u\n", reason, grams, servo);
+
+    // Sensordaten vor Fütterung für den Event-Log sichern
+    pendingEvent = {};
+    strlcpy(pendingEvent.timeStr, statusData.timeStr, sizeof(pendingEvent.timeStr));
+    pendingEvent.isAuto   = (strcmp(reason, "schedule") == 0);
+    pendingEvent.grams    = grams;
+    pendingEvent.servo    = servo;
+    pendingEvent.distBefore = statusData.distMM;
+    pendingEvent.fillBefore = statusData.fillPct;
+    pendingEvent.ir1Before  = statusData.ir1Analog;
+    pendingEvent.ir2Before  = statusData.ir2Analog;
+    pendingEventValid = true;
+
     motors.dispense(grams, servo, cfg);
 }
 
@@ -151,16 +187,28 @@ static void handleWebFeedRequest() {
     startFeed(grams, servo, "web");
 }
 
-// Fütterungsende erkennen (Flanke dispensing: true→false)
+// Flanke dispensing true→false: Feed-Counter buchen + Log-Eintrag abschließen
 static void checkFeedComplete() {
     bool nowDispensing = motors.dispensing();
     if (wasDispensing && !nowDispensing) {
         statusData.feeds++;
         cfgMgr.saveFeedCount(statusData.feeds);
         notifyEvent("Feeding completed");
+
+        if (pendingEventValid) {
+            // Sensordaten nach Fütterung aus frisch aktualisiertem statusData
+            pendingEvent.distAfter = statusData.distMM;
+            pendingEvent.fillAfter = statusData.fillPct;
+            pendingEvent.ir1After  = statusData.ir1Analog;
+            pendingEvent.ir2After  = statusData.ir2Analog;
+            feedLog.add(pendingEvent);
+            pendingEventValid = false;
+        }
     }
     wasDispensing = nowDispensing;
 }
+
+// ─── Setup / Loop ───────────────────────────────────────────────────────────
 
 void setup() {
     Serial.begin(115200);
@@ -179,7 +227,8 @@ void setup() {
     motors.selfTest(cfg);
     refreshStatus();
 
-    web.begin(cfg, statusData, sensors, motors, cfgMgr);
+    web.begin(cfg, statusData, sensors, motors, cfgMgr, feedLog);
+    syncNTP();
     beginOTA();
 
     notifyEvent(F("Boot complete"));
@@ -187,7 +236,7 @@ void setup() {
 
 void loop() {
     ArduinoOTA.handle();
-    if (otaActive) return;   // während OTA: kein Sensor-Blocking, kein SSE
+    if (otaActive) return;
     motors.loop();
     refreshStatus();
     web.loop();

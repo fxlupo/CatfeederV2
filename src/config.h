@@ -6,8 +6,8 @@
 #include <Preferences.h>
 
 // ─── Firmware ───────────────────────────────────────────────────────────────
-#define FW_VERSION             "1.0.9"
-#define CONFIG_SCHEMA_VERSION  5
+#define FW_VERSION             "1.1.0"
+#define CONFIG_SCHEMA_VERSION  6
 
 // ─── WLAN ───────────────────────────────────────────────────────────────────
 #define WIFI_AP_SSID           "CatFeeder-Setup"
@@ -50,7 +50,9 @@
 
 // ─── Fütterung ──────────────────────────────────────────────────────────────
 #define MAX_SLOTS              4       // Fütterungszeiten pro Tag
-#define DEFAULT_STEPS_PER_GRAM 300      // Stepper-Schritte pro Gramm
+#define DEFAULT_STEPS_PER_GRAM 300     // Stepper-Schritte pro Gramm
+#define DEFAULT_FEED_GRAMS     20      // Standard-Fütterungsmenge g
+#define FEED_LOG_SIZE          20      // Einträge im RAM-Ringpuffer
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Datenstrukturen
@@ -104,6 +106,9 @@ struct Config {
 
     // Blockierschutz
     uint16_t stepperBlockMA; // Strom-Schwelle für Stall-Erkennung (mA)
+
+    // Fütterung
+    uint16_t defaultGrams;   // Standard-Menge für manuelles Füttern
 };
 
 struct Status {
@@ -148,6 +153,42 @@ struct Status {
     uint32_t feeds;          // Gesamtfütterungen
     bool     overcurrent;
     bool     fillLow;
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Event-Log (RAM-Ringpuffer, nicht persistent)
+// ═════════════════════════════════════════════════════════════════════════════
+
+struct FeedEvent {
+    char     timeStr[20];  // Zeitstempel beim Start "DD.MM.YYYY HH:MM:SS"
+    bool     isAuto;       // true = Zeitplan, false = manuell
+    uint16_t grams;
+    uint8_t  servo;
+    uint16_t distBefore;   // VL53L0X mm vor Fütterung
+    uint16_t distAfter;    // VL53L0X mm nach Fütterung
+    uint8_t  fillBefore;   // Füllstand % vor
+    uint8_t  fillAfter;    // Füllstand % nach
+    uint16_t ir1Before;    // IR1 analog vor
+    uint16_t ir2Before;    // IR2 analog vor
+    uint16_t ir1After;     // IR1 analog nach
+    uint16_t ir2After;     // IR2 analog nach
+};
+
+struct FeedLog {
+    FeedEvent entries[FEED_LOG_SIZE];
+    uint8_t   head  = 0;   // nächste Schreibposition
+    uint8_t   count = 0;   // gültige Einträge (0..FEED_LOG_SIZE)
+
+    void add(const FeedEvent &e) {
+        entries[head] = e;
+        head = (head + 1) % FEED_LOG_SIZE;
+        if (count < FEED_LOG_SIZE) count++;
+    }
+    // i=0 → ältester Eintrag
+    const FeedEvent& get(uint8_t i) const {
+        if (count < FEED_LOG_SIZE) return entries[i];
+        return entries[(head + i) % FEED_LOG_SIZE];
+    }
 };
 
 // ═════════════════════════════════════════════════════════════════════════════

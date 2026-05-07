@@ -1,5 +1,45 @@
 # Iterationen
 
+## 2026-05-07 - NTP-Sync, PWA-Icon, Default-Menge, Event-Log (1.1.0)
+
+Scope:
+
+- Firmware-Version auf `1.1.0` gesetzt, Config-Schema auf 6.
+
+**NTP-Synchronisation:**
+- `syncNTP()` in `main.cpp`: nach WiFi-Connect wird `configTime()` mit dem
+  konfigurierten UTC-Offset + DST aufgerufen.
+- Nach erfolgreicher NTP-Abfrage wird die DS3231-RTC automatisch gesetzt.
+- Timeout 8 s; bei AP-Modus (kein WLAN) übersprungen.
+
+**PWA / App-Icon:**
+- `/icon.svg` Route: Pfotenabdruck-Icon (SVG, roter Hintergrund).
+- `/manifest.json` Route: PWA-Manifest mit Name, Farben, Display-Modus.
+- HTML-Head: `<link rel="icon">`, `<link rel="apple-touch-icon">`,
+  `<link rel="manifest">`, `<meta name="apple-mobile-web-app-capable">`,
+  `<meta name="theme-color">`.
+- Anzeige als eigenständige App beim Hinzufügen zum Home-Screen (iOS/Android).
+
+**Standard-Fütterungsmenge:**
+- `Config::defaultGrams` (NVS-persistent, Default 20 g, 1–500 g).
+- REST-API: Schlüssel `dfg` in GET/POST `/api/config`.
+- Einstellungen-Tab: neues Feld "Standardmenge (g)".
+- Status-Tab: Mengenfeld wird beim Laden der Config auf `defaultGrams` gesetzt.
+
+**Event-Log:**
+- `FeedEvent`-Struct: Zeitstempel, Auto/Manuell, Gramm, Servo,
+  VL53L0X (mm + %) vor/nach, IR1/IR2 Analog vor/nach.
+- `FeedLog`-Ringpuffer (20 Einträge, RAM, nicht persistent).
+- `startFeed()` sichert Sensordaten vor Fütterung.
+- `checkFeedComplete()` ergänzt Sensordaten nach Fütterung und fügt Eintrag ein.
+- REST-API: GET `/api/log` liefert alle Einträge neueste zuerst.
+- Neuer "Log"-Tab in der Web-UI: Karten-Layout mit Füllstand, VL53-mm, IR-Werten.
+
+Verifikation:
+
+- `pio run` erfolgreich für `esp32dev`.
+- RAM: 16.2 %, Flash: 76.8 %.
+
 ## 2026-05-07 - Stepper-Klopfen durch Step-Bursts behoben (1.0.9)
 
 Scope:

@@ -12,7 +12,7 @@
 
 class Web {
 public:
-    void begin(Config &c, Status &st, Sensors &se, Motors &mo, CfgManager &cm);
+    void begin(Config &c, Status &st, Sensors &se, Motors &mo, CfgManager &cm, FeedLog &fl);
     void loop();
     bool apMode() { return _ap; }
     String ip();
@@ -31,6 +31,7 @@ private:
     Sensors    *_se = nullptr;
     Motors     *_mo = nullptr;
     CfgManager *_cm = nullptr;
+    FeedLog    *_fl = nullptr;
 
     bool     _ap = false;
     uint32_t _lastSSE = 0;

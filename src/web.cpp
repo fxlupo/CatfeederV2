@@ -4,8 +4,8 @@
 #include "web.h"
 #include <ESPmDNS.h>
 
-void Web::begin(Config &c, Status &st, Sensors &se, Motors &mo, CfgManager &cm) {
-    _c = &c; _st = &st; _se = &se; _mo = &mo; _cm = &cm;
+void Web::begin(Config &c, Status &st, Sensors &se, Motors &mo, CfgManager &cm, FeedLog &fl) {
+    _c = &c; _st = &st; _se = &se; _mo = &mo; _cm = &cm; _fl = &fl;
     _wifi();
     _routes();
     _srv.addHandler(&_sse);
@@ -150,6 +150,7 @@ void Web::_routes() {
         d["spu"]=_c->stepperPulseUS; d["sdi"]=_c->stepperInvertDir;
         d["sds"]=_c->stepperDirSetupUS; d["shm"]=_c->stepperHoldMS;
         d["sbm"]=_c->stepperBlockMA;
+        d["dfg"]=_c->defaultGrams;
         d["s1o"]=_c->s1Open; d["s1c"]=_c->s1Close;
         d["s2o"]=_c->s2Open; d["s2c"]=_c->s2Close;
         d["svs"]=_c->servoSpeedDPS;
@@ -184,6 +185,7 @@ void Web::_routes() {
         if (!doc["sds"].isNull()) _c->stepperDirSetupUS = constrain((uint16_t)doc["sds"], 0, 2000);
         if (!doc["shm"].isNull()) _c->stepperHoldMS = constrain((uint16_t)doc["shm"], 0, 5000);
         if (!doc["sbm"].isNull()) _c->stepperBlockMA = constrain((uint16_t)doc["sbm"], 100, 5000);
+        if (!doc["dfg"].isNull()) _c->defaultGrams   = constrain((uint16_t)doc["dfg"], 1, 500);
         if (!doc["s1o"].isNull()) _c->s1Open   = doc["s1o"];
         if (!doc["s1c"].isNull()) _c->s1Close  = doc["s1c"];
         if (!doc["s2o"].isNull()) _c->s2Open   = doc["s2o"];
@@ -260,6 +262,50 @@ void Web::_routes() {
         _cm->defaults(*_c); _cm->save(*_c);
         r->send(200, "application/json", "{\"ok\":1}");
         delay(1500); ESP.restart();
+    });
+
+    // GET Event-Log
+    _srv.on("/api/log", HTTP_GET, [this](AsyncWebServerRequest *r) {
+        JsonDocument d;
+        d["count"] = _fl->count;
+        JsonArray ev = d["events"].to<JsonArray>();
+        // Neueste zuerst
+        for (int8_t i = _fl->count - 1; i >= 0; i--) {
+            const FeedEvent &e = _fl->get(i);
+            JsonObject o = ev.add<JsonObject>();
+            o["t"]   = e.timeStr;
+            o["a"]   = e.isAuto;
+            o["g"]   = e.grams;
+            o["sv"]  = e.servo;
+            o["db"]  = e.distBefore; o["da"] = e.distAfter;
+            o["fb"]  = e.fillBefore; o["fa"] = e.fillAfter;
+            o["i1b"] = e.ir1Before;  o["i2b"] = e.ir2Before;
+            o["i1a"] = e.ir1After;   o["i2a"] = e.ir2After;
+        }
+        String j; serializeJson(d, j);
+        r->send(200, "application/json", j);
+    });
+
+    // GET PWA-Manifest
+    _srv.on("/manifest.json", HTTP_GET, [this](AsyncWebServerRequest *r) {
+        String m = F("{\"name\":\"CatFeeder\",\"short_name\":\"CatFeeder\","
+                     "\"start_url\":\"/\",\"display\":\"standalone\","
+                     "\"background_color\":\"#0f1117\",\"theme_color\":\"#e8564a\","
+                     "\"icons\":[{\"src\":\"/icon.svg\",\"type\":\"image/svg+xml\","
+                     "\"sizes\":\"any\"}]}");
+        r->send(200, "application/manifest+json", m);
+    });
+
+    // GET App-Icon (SVG Pfotenabdruck)
+    _srv.on("/icon.svg", HTTP_GET, [](AsyncWebServerRequest *r) {
+        String s = F("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+                     "<rect width='100' height='100' rx='20' fill='#e8564a'/>"
+                     "<circle cx='50' cy='62' r='20' fill='#fff'/>"
+                     "<circle cx='25' cy='42' r='11' fill='#fff'/>"
+                     "<circle cx='75' cy='42' r='11' fill='#fff'/>"
+                     "<circle cx='37' cy='28' r='8' fill='#fff'/>"
+                     "<circle cx='63' cy='28' r='8' fill='#fff'/></svg>");
+        r->send(200, "image/svg+xml", s);
     });
 
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin",  "*");

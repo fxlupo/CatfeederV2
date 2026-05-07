@@ -73,6 +73,7 @@ static void beginOTA() {
         notifyEvent(F("OTA start"));
         motors.stop();
         motors.detachServos();
+        web.closeSSE();          // SSE-Clients trennen → weniger WiFi-Contention
     });
     ArduinoOTA.onEnd([]() {
         otaActive = false;
@@ -83,6 +84,7 @@ static void beginOTA() {
         Serial.printf("[OTA] %u%%\n", total > 0 ? progress * 100U / total : 0);
     });
     ArduinoOTA.onError([](ota_error_t error) {
+        otaActive = false;       // WICHTIG: Loop wieder freigeben nach Fehler
         setOtaPhase("error");
         switch (error) {
             case OTA_AUTH_ERROR:    setOtaError("auth");    break;
@@ -92,6 +94,7 @@ static void beginOTA() {
             case OTA_END_ERROR:     setOtaError("end");     break;
             default:                setOtaError("unknown"); break;
         }
+        Serial.println(F("[OTA] Fehler – Betrieb wird fortgesetzt"));
     });
 
     setOtaPhase("ready");

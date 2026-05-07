@@ -21,6 +21,10 @@ void Web::loop() {
     if (millis() - _lastSSE > 2000) { _sendSSE(); _lastSSE = millis(); }
 }
 
+void Web::closeSSE() {
+    _sse.close();
+}
+
 String Web::ip() {
     return _ap ? WiFi.softAPIP().toString() : WiFi.localIP().toString();
 }
@@ -39,6 +43,7 @@ void Web::_wifi() {
         }
         if (WiFi.status() == WL_CONNECTED) {
             _ap = false;
+            WiFi.setSleep(false);   // Power-Save deaktivieren für stabiles OTA
             Serial.printf("\n[WiFi] OK  IP %s\n", WiFi.localIP().toString().c_str());
             return;
         }
@@ -47,6 +52,7 @@ void Web::_wifi() {
     _ap = true;
     WiFi.mode(WIFI_AP);
     WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASS);
+    WiFi.setSleep(false);
     Serial.printf("[WiFi] AP '%s'  pw '%s'  IP %s\n",
                   WIFI_AP_SSID, WIFI_AP_PASS, WiFi.softAPIP().toString().c_str());
 }

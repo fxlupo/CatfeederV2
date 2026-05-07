@@ -14,6 +14,7 @@ class Web {
 public:
     void begin(Config &c, Status &st, Sensors &se, Motors &mo, CfgManager &cm, FeedLog &fl);
     void loop();
+    void closeSSE();             // SSE-Clients vor OTA trennen
     bool apMode() { return _ap; }
     String ip();
 

@@ -1,5 +1,40 @@
 # Iterationen
 
+## 2026-05-07 - OTA-Stabilität: drei Ursachen behoben (1.1.3)
+
+Scope:
+
+- Firmware-Version auf `1.1.3` gesetzt.
+
+Ursachen und Fixes:
+
+**Bug 1 – Kritisch: `otaActive` blieb nach OTA-Fehler dauerhaft `true`**
+- `onError`-Callback setzte `otaActive` nie zurück.
+- Folge: Main Loop lief nach einem fehlgeschlagenen OTA-Versuch dauerhaft
+  im `if (otaActive) return` — Web-UI tot, Sensoren eingefroren, OTA nicht
+  mehr erreichbar → einziger Ausweg war USB-Flash.
+- Fix: `otaActive = false` als erstes Statement in `onError`.
+
+**Bug 2 – WiFi Power-Save-Modus aktiv**
+- ESP32 schaltet das WiFi-Radio im Standard periodisch ab (Modem Sleep).
+- Erzeugt Latenz-Spikes von 10–100 ms direkt im OTA-Datenstrom → zufällige
+  Timeouts und Abbrüche an wechselnden Positionen.
+- Fix: `WiFi.setSleep(false)` nach erfolgreichem Connect und im AP-Modus.
+
+**Bug 3 – Offene SSE-Verbindungen während OTA-Transfer**
+- ESPAsyncWebServer läuft auf eigenem FreeRTOS-Task und konkuriert auch
+  während OTA um WiFi-Stack-Ressourcen.
+- Fix: `web.closeSSE()` in `onStart` schließt alle SSE-Clients vor dem
+  Transfer.
+
+**Zusatz: OTA-Timeout erhöht**
+- `upload_flags = --timeout=60` im `esp32dev_ota`-Environment.
+- Verhindert vorzeitige Upload-Abbrüche bei temporär langsamer WiFi-Verbindung.
+
+Verifikation:
+
+- `pio run` erfolgreich für `esp32dev`.
+
 ## 2026-05-07 - IR-Impulszählung und Sensorübersicht (1.1.2)
 
 Scope:

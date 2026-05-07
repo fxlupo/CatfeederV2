@@ -6,7 +6,7 @@
 #include <Preferences.h>
 
 // ─── Firmware ───────────────────────────────────────────────────────────────
-#define FW_VERSION             "1.0.7"
+#define FW_VERSION             "1.0.8"
 #define CONFIG_SCHEMA_VERSION  5
 
 // ─── WLAN ───────────────────────────────────────────────────────────────────
@@ -42,15 +42,15 @@
 #define SERVO_DEFAULT_SPEED_DPS 1000   // Grad/s, hohe Werte fahren direkt
 
 // ─── Sensoren ───────────────────────────────────────────────────────────────
-#define FILL_EMPTY_MM          300     // VL53L0X Abstand = Behälter leer
-#define FILL_FULL_MM           30      // VL53L0X Abstand = Behälter voll
+#define FILL_EMPTY_MM          70     // VL53L0X Abstand = Behälter leer
+#define FILL_FULL_MM           10      // VL53L0X Abstand = Behälter voll
 #define IR_THRESHOLD           2048    // Analog-Schwelle IR
 #define INA_OVERCURRENT_MA     2000    // Überstrom-Grenze mA
 #define STEPPER_DEFAULT_BLOCK_MA 1500  // Blockierstrom-Schwelle mA (Stepper-Stall)
 
 // ─── Fütterung ──────────────────────────────────────────────────────────────
-#define MAX_SLOTS              8       // Fütterungszeiten pro Tag
-#define DEFAULT_STEPS_PER_GRAM 10      // Stepper-Schritte pro Gramm
+#define MAX_SLOTS              4       // Fütterungszeiten pro Tag
+#define DEFAULT_STEPS_PER_GRAM 300      // Stepper-Schritte pro Gramm
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Datenstrukturen

@@ -47,6 +47,9 @@ type Device = {
   alerts?: Record<string, any>[];
   commands?: Record<string, any>[];
 };
+type Health = {
+  platformVersion?: string;
+};
 
 const api = {
   async get<T>(url: string): Promise<T> {
@@ -73,6 +76,7 @@ function App() {
   const [feedGrams, setFeedGrams] = useState(5);
   const [feedServo, setFeedServo] = useState(0);
   const [notice, setNotice] = useState('');
+  const [platformVersion, setPlatformVersion] = useState('0.2.0');
 
   async function loadDevice(id = deviceId) {
     const data = await api.get<Device>(`/api/devices/${id}`);
@@ -82,6 +86,9 @@ function App() {
 
   useEffect(() => {
     loadDevice().catch(() => undefined);
+    api.get<Health>('/api/health')
+      .then((health) => setPlatformVersion(health.platformVersion ?? '0.2.0'))
+      .catch(() => undefined);
     const source = new EventSource('/api/events');
     const refresh = () => loadDevice().catch(() => undefined);
     source.addEventListener('device', refresh);
@@ -142,7 +149,7 @@ function App() {
       <header className="topbar">
         <div>
           <h1>CatFeeder</h1>
-          <p>{online ? 'Online' : 'Offline'} · {device.status?.fw ?? device.config?.fw ?? 'Firmware unbekannt'} · zuletzt {formatAge(device.ageSeconds)}</p>
+          <p>{online ? 'Online' : 'Offline'} · Firmware {device.status?.fw ?? device.config?.fw ?? 'unbekannt'} · Plattform {platformVersion} · zuletzt {formatAge(device.ageSeconds)}</p>
         </div>
         <label className="device-picker">
           <span>Device</span>

@@ -1,10 +1,13 @@
 # Iterationen
 
-## 2026-05-08 - Docker-Plattform fuer Iteration 2 begonnen (1.4.0)
+## 2026-05-08 - Iteration 2 abgeschlossen: Docker-Plattform Baseline (1.4.0 / Platform 0.2.0)
 
 Scope:
 
 - Firmware-Version auf `1.4.0` gesetzt.
+- Plattform-Version `0.2.0` eingefuehrt.
+- Backend liefert `platformVersion` ueber `/api/health`.
+- React UI zeigt Firmware- und Plattform-Version im Header.
 - MQTT-Firmware um `cmd/config/set` erweitert, damit Backend/UI
   Fuetterungszeiten und Kalibrierwerte persistent an den ESP senden koennen.
 - Docker Compose fuer Mosquitto, Postgres, Backend und Frontend angelegt.
@@ -74,6 +77,12 @@ Verifikation:
     ist.
   - Command-Anzeige trennt aktive Commands von juengerer Historie.
   - Terminale Commands und Alerts koennen per API/UI bereinigt werden.
+
+Ergebnis:
+
+- Iteration 2 ist abgeschlossen.
+- Iteration 3 startet ab hier offiziell mit Mobile-first/PWA-Fokus fuer
+  Android und iOS, robustem Remote-Betrieb, Push und Config-Sync-Haertung.
 
 ## 2026-05-08 - MQTT-Grundlage auf ESP umgesetzt (1.3.0)
 

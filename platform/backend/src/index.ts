@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 
 const { Pool } = pg;
 
+const platformVersion = '0.2.0';
 const port = Number(process.env.PORT ?? 3000);
 const mqttUrl = process.env.MQTT_URL ?? 'mqtt://localhost:1883';
 const mqttUsername = process.env.MQTT_USERNAME ?? 'backend';
@@ -411,6 +412,7 @@ async function main() {
 
   app.get('/api/health', async () => ({
     ok: true,
+    platformVersion,
     mqttConnected: mqttClient.connected,
     devices: devices.size,
     offlineAfterMs,

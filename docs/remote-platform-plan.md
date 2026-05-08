@@ -1,6 +1,6 @@
 # Remote-Plattform-Plan
 
-Status: Iteration 2 in Umsetzung
+Status: Iteration 2 abgeschlossen, Iteration 3 startet
 Ziel: Dieser Plan wird waehrend der Umsetzung laufend aktualisiert und bleibt
 der fuehrende Implementierungsplan fuer Remote-Zugriff, externe UI und Backend.
 
@@ -443,7 +443,7 @@ Akzeptanz:
 
 ### Iteration 2 - Docker-Plattform
 
-Status: Grundgeruest angelegt, Docker-Laufzeittest offen
+Status: abgeschlossen am 2026-05-08
 
 Ziel:
 
@@ -528,12 +528,20 @@ Aktueller Implementierungsstand:
   - Offline-Devices bekommen keine Feed-/Config-Kommandos.
   - UI deaktiviert kritische Aktionen offline.
   - Erledigte Commands und Alerts koennen bereinigt werden.
+- Plattform-Version `0.2.0`:
+  - Backend liefert `platformVersion` ueber `/api/health`.
+  - React UI zeigt Firmware- und Plattform-Version im Header.
 
 ### Iteration 3 - Config, Logs und Remote-Betrieb haerten
+
+Status: geplant / startet nach Iteration-2-Abschluss
 
 Ziel:
 
 - Remote-Betrieb ist robust, nachvollziehbar und sicher.
+- UI wird Mobile-first als WebApp/PWA fuer Android und iOS weiterentwickelt,
+  weil der CatFeeder hauptsaechlich am Handy bedient wird.
+- Push-Benachrichtigungen werden als Mobile-WebApp-Thema mitgedacht.
 
 Umfang:
 
@@ -550,6 +558,12 @@ Umfang:
   - Sensorfehler
   - OTA-Fehler
 - UI fuer Alert-Konfiguration.
+- Mobile-first UI-Haertung:
+  - kleine Viewports zuerst
+  - Touch-Bedienung
+  - PWA-Manifest
+  - installierbare WebApp
+  - sinnvolle Push-Strategie fuer Android/iOS
 - Device-Token-Rotation.
 - Backup/Restore fuer Config.
 - ESP-WebUI auf Minimalmodus vorbereiten.
@@ -566,7 +580,6 @@ Akzeptanz:
 - OTA ueber Backend orchestrieren, aber Upload weiter lokal freigeben.
 - Firmware-Artefakte im Backend verwalten.
 - Mehrere CatFeeder-Devices.
-- Mobile PWA.
 - Grafana/Prometheus fuer Langzeitmetriken.
 - Lokaler Edge-Gateway-Modus fuer Haushalte ohne direkten MQTT-Zugang vom ESP.
 
@@ -594,10 +607,9 @@ Akzeptanz:
 
 ## Aktueller naechster Schritt
 
-Start mit Iteration 1:
+Start Iteration 3:
 
-1. MQTT Library auswaehlen.
-2. MQTT Config-Struktur im ESP entwerfen.
-3. Topics und JSON-Formate minimal implementieren.
-4. Lokalen Mosquitto-Test gegen `status`, `telemetry`, `cmd/feed`.
-5. Plan anhand der echten Implementierung aktualisieren.
+1. Mobile-first UI/PWA-Grundlage definieren.
+2. Desired/Reported Config-Sync modellieren.
+3. Alert- und Push-Strategie fuer Android/iOS festlegen.
+4. Command- und Audit-Log weiter haerten.

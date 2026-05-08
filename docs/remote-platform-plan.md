@@ -1,6 +1,6 @@
 # Remote-Plattform-Plan
 
-Status: Iteration 1 Firmware-Grundlage umgesetzt, Broker-Test offen
+Status: Iteration 1 umgesetzt und gegen lokalen Mosquitto getestet
 Ziel: Dieser Plan wird waehrend der Umsetzung laufend aktualisiert und bleibt
 der fuehrende Implementierungsplan fuer Remote-Zugriff, externe UI und Backend.
 
@@ -383,7 +383,7 @@ gesendet werden, nicht vom ESP.
 
 ### Iteration 1 - MQTT-Grundlage auf ESP
 
-Status: Firmware umgesetzt, Broker-/Hardware-Test offen
+Status: umgesetzt und lokal getestet
 
 Ziel:
 
@@ -436,8 +436,8 @@ Aktueller Implementierungsstand:
 
 Akzeptanz:
 
-- Mosquitto lokal empfaengt Status/Telemetry.
-- Ein MQTT-Feed-Kommando loest eine Fütterung aus.
+- Mosquitto lokal empfaengt Status/Telemetry. Erledigt am 2026-05-08.
+- Ein MQTT-Feed-Kommando loest eine Fütterung aus. Erledigt am 2026-05-08.
 - ESP bestaetigt das Kommando mit Ack und Result.
 - Fütterung per lokalem Scheduler funktioniert weiterhin ohne MQTT.
 

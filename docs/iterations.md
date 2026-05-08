@@ -1,6 +1,6 @@
 # Iterationen
 
-## 2026-05-08 - MQTT-Grundlage auf ESP begonnen (1.3.0)
+## 2026-05-08 - MQTT-Grundlage auf ESP umgesetzt (1.3.0)
 
 Scope:
 
@@ -23,7 +23,10 @@ Verifikation:
 
 - `pio run -e esp32dev` erfolgreich.
 - `pio run -e esp32dev_ota` erfolgreich.
-- Noch nicht gegen einen echten Mosquitto-Broker / Remote-Feed getestet.
+- ESP verbindet sich mit lokalem Mosquitto.
+- Mosquitto empfaengt `config/reported`, `status` und `telemetry`.
+- MQTT-Feed-Kommando ueber `catfeeder/catfeeder/cmd/feed` loest Stepper und
+  Servoablauf aus.
 
 ## 2026-05-07 - Remote-Plattform-Plan angelegt
 

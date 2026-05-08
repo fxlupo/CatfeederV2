@@ -565,6 +565,10 @@ Aktueller Implementierungsstand:
   - Backend berechnet `configSync` als `synced`, `pending`, `drift` oder
     `unknown`.
   - UI zeigt Config-Sync-Status in Dashboard, Zeitplan und Kalibrierung.
+- Plattform-Version `0.4.1`:
+  - UI schuetzt lokale Config-Entwuerfe vor Live-Refresh-Overwrite.
+  - Config-Formulare arbeiten bevorzugt auf `configDesired`.
+  - Mobile Config-Seiten haben einen Speichern-Button direkt oben.
 
 Umfang:
 

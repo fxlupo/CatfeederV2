@@ -184,6 +184,16 @@ button:disabled {
   margin-top: 10px;
 }
 
+.save-top {
+  margin-bottom: 14px;
+}
+
+.draft-note {
+  color: #75510f;
+  font-size: 13px;
+  margin: -4px 0 10px;
+}
+
 .sync-note {
   align-items: center;
   border: 1px solid #edf0f3;

@@ -1,5 +1,23 @@
 # Iterationen
 
+## 2026-05-08 - Iteration 3 Config-Formular entkoppelt (Platform 0.4.1)
+
+Scope:
+
+- Plattform-Version auf `0.4.1` gesetzt.
+- React UI ueberschreibt lokale Config-Entwuerfe nicht mehr durch Live-Refresh,
+  solange ungespeicherte Aenderungen im Formular stehen.
+- Config-Formulare verwenden `configDesired` als Bearbeitungsbasis, wenn diese
+  vorhanden ist; sonst `configReported`.
+- Nach Speichern setzt die UI den Config-Sync lokal sofort auf `pending`, bis
+  der naechste ESP-Report eintrifft.
+- Zeitplan und Kalibrierung haben zusaetzlich oben einen Speichern-Button,
+  damit man auf Mobile nicht erst ans Ende der Seite scrollen muss.
+
+Verifikation:
+
+- Backend- und Frontend-Build lokal pruefen.
+
 ## 2026-05-08 - Iteration 3 Config-Sync Basis (Platform 0.4.0)
 
 Scope:

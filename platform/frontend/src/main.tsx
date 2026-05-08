@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   Activity,
@@ -85,18 +85,30 @@ function App() {
   const [feedGrams, setFeedGrams] = useState(5);
   const [feedServo, setFeedServo] = useState(0);
   const [notice, setNotice] = useState('');
-  const [platformVersion, setPlatformVersion] = useState('0.4.0');
+  const [platformVersion, setPlatformVersion] = useState('0.4.1');
+  const [configDirty, setConfigDirty] = useState(false);
+  const configDirtyRef = useRef(false);
 
   async function loadDevice(id = deviceId) {
     const data = await api.get<Device>(`/api/devices/${id}`);
     setDevice(data);
-    setConfigDraft(normalizeConfig(data.config));
+    if (!configDirtyRef.current) {
+      setConfigDraft(normalizeConfig(data.configDesired ?? data.config));
+    }
+  }
+
+  function updateConfigDraft(next: Config) {
+    configDirtyRef.current = true;
+    setConfigDirty(true);
+    setConfigDraft(next);
   }
 
   useEffect(() => {
+    configDirtyRef.current = false;
+    setConfigDirty(false);
     loadDevice().catch(() => undefined);
     api.get<Health>('/api/health')
-      .then((health) => setPlatformVersion(health.platformVersion ?? '0.4.0'))
+      .then((health) => setPlatformVersion(health.platformVersion ?? '0.4.1'))
       .catch(() => undefined);
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => undefined);
@@ -140,7 +152,21 @@ function App() {
       setNotice('Device offline');
       return;
     }
-    await api.send(`/api/devices/${deviceId}/config`, 'PUT', configDraft);
+    const sentConfig = normalizeConfig(configDraft);
+    await api.send(`/api/devices/${deviceId}/config`, 'PUT', sentConfig);
+    configDirtyRef.current = false;
+    setConfigDirty(false);
+    setConfigDraft(sentConfig);
+    setDevice((current) => ({
+      ...current,
+      configDesired: sentConfig,
+      configSync: {
+        ...current.configSync,
+        state: 'pending',
+        desiredUpdatedAt: new Date().toISOString(),
+        message: 'waiting-for-device-report',
+      },
+    }));
     setNotice('Konfiguration gesendet');
   }
 
@@ -246,6 +272,8 @@ function App() {
       {tab === 'schedule' && (
         <Panel title="Fütterungszeiten" icon={<CalendarClock size={18} />} wide>
           <ConfigSyncNote sync={device.configSync} />
+          {configDirty && <p className="draft-note">Ungespeicherte Änderungen</p>}
+          <button className="primary save-top" onClick={saveConfig} disabled={!online}><Save size={18} />Speichern</button>
           <div className="table">
             {(configDraft.slots ?? []).map((slot, index) => (
               <div className="slot-row" key={index}>
@@ -265,16 +293,18 @@ function App() {
       {tab === 'calibration' && (
         <Panel title="Kalibrierung" icon={<Settings size={18} />} wide>
           <ConfigSyncNote sync={device.configSync} />
+          {configDirty && <p className="draft-note">Ungespeicherte Änderungen</p>}
+          <button className="primary save-top" onClick={saveConfig} disabled={!online}><Save size={18} />Speichern</button>
           <div className="settings-grid">
-            <NumberField label="Default Gramm" value={configDraft.defaultGrams} onChange={(v) => setConfigDraft({ ...configDraft, defaultGrams: v })} />
-            <NumberField label="Steps pro Gramm" value={configDraft.stepsPerGram} onChange={(v) => setConfigDraft({ ...configDraft, stepsPerGram: v })} />
-            <NumberField label="Stepper Speed" value={configDraft.stepperSpeed} onChange={(v) => setConfigDraft({ ...configDraft, stepperSpeed: v })} />
-            <NumberField label="Blockade mA" value={configDraft.stepperBlockMA} onChange={(v) => setConfigDraft({ ...configDraft, stepperBlockMA: v })} />
-            <NumberField label="Servo Speed" value={configDraft.servoSpeedDPS} onChange={(v) => setConfigDraft({ ...configDraft, servoSpeedDPS: v })} />
-            <NumberField label="S1 Open" value={configDraft.s1Open} onChange={(v) => setConfigDraft({ ...configDraft, s1Open: v })} />
-            <NumberField label="S1 Close" value={configDraft.s1Close} onChange={(v) => setConfigDraft({ ...configDraft, s1Close: v })} />
-            <NumberField label="S2 Open" value={configDraft.s2Open} onChange={(v) => setConfigDraft({ ...configDraft, s2Open: v })} />
-            <NumberField label="S2 Close" value={configDraft.s2Close} onChange={(v) => setConfigDraft({ ...configDraft, s2Close: v })} />
+            <NumberField label="Default Gramm" value={configDraft.defaultGrams} onChange={(v) => updateConfigDraft({ ...configDraft, defaultGrams: v })} />
+            <NumberField label="Steps pro Gramm" value={configDraft.stepsPerGram} onChange={(v) => updateConfigDraft({ ...configDraft, stepsPerGram: v })} />
+            <NumberField label="Stepper Speed" value={configDraft.stepperSpeed} onChange={(v) => updateConfigDraft({ ...configDraft, stepperSpeed: v })} />
+            <NumberField label="Blockade mA" value={configDraft.stepperBlockMA} onChange={(v) => updateConfigDraft({ ...configDraft, stepperBlockMA: v })} />
+            <NumberField label="Servo Speed" value={configDraft.servoSpeedDPS} onChange={(v) => updateConfigDraft({ ...configDraft, servoSpeedDPS: v })} />
+            <NumberField label="S1 Open" value={configDraft.s1Open} onChange={(v) => updateConfigDraft({ ...configDraft, s1Open: v })} />
+            <NumberField label="S1 Close" value={configDraft.s1Close} onChange={(v) => updateConfigDraft({ ...configDraft, s1Close: v })} />
+            <NumberField label="S2 Open" value={configDraft.s2Open} onChange={(v) => updateConfigDraft({ ...configDraft, s2Open: v })} />
+            <NumberField label="S2 Close" value={configDraft.s2Close} onChange={(v) => updateConfigDraft({ ...configDraft, s2Close: v })} />
           </div>
           <button className="primary" onClick={saveConfig} disabled={!online}><Save size={18} />Speichern</button>
           {!online && <p className="muted action-note">Speichern ist offline gesperrt</p>}
@@ -299,7 +329,7 @@ function App() {
   function updateSlot(index: number, patch: Partial<Slot>) {
     const slots = [...(configDraft.slots ?? defaultSlots())];
     slots[index] = { ...slots[index], ...patch };
-    setConfigDraft({ ...configDraft, slots });
+    updateConfigDraft({ ...configDraft, slots });
   }
 }
 

@@ -56,7 +56,11 @@ services:
       MQTT_URL: mqtt://mqtt:1883
       MQTT_USERNAME: ${MQTT_BACKEND_USER:-backend}
       MQTT_PASSWORD: ${MQTT_BACKEND_PASS:-catfeeder-backend-change-me}
-      DATABASE_URL: postgres://${POSTGRES_USER:-catfeeder}:${POSTGRES_PASSWORD:-catfeeder-db-change-me}@db:5432/${POSTGRES_DB:-catfeeder}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-catfeeder}
+      POSTGRES_USER: ${POSTGRES_USER:-catfeeder}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-catfeeder-db-change-me}
     ports:
       - "${BACKEND_PORT:-3000}:3000"
 

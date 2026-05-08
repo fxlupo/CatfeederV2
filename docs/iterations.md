@@ -30,6 +30,9 @@ Scope:
 - Mosquitto Passwortdatei und ACL werden nun unter `/mosquitto/data` erzeugt
   und dem Container-User `mosquitto` uebergeben, damit der Broker sie nach dem
   Drop auf den nicht-root User lesen kann.
+- Backend nutzt fuer Postgres einzelne Umgebungsvariablen statt
+  `DATABASE_URL`, damit Passwoerter mit Sonderzeichen nicht URL-encodiert
+  werden muessen.
 
 Verifikation:
 

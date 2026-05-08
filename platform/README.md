@@ -7,6 +7,10 @@ Docker-Stack fuer Iteration 2:
 - React UI hinter Nginx
 - optionaler Traefik-Override fuer externen HTTPS-Zugriff
 
+Postgres-Zugangsdaten werden als einzelne Umgebungsvariablen an das Backend
+gegeben, nicht als zusammengesetzte URL. Dadurch funktionieren Passwoerter mit
+Sonderzeichen ohne URL-Encoding.
+
 ## Start lokal
 
 ```sh

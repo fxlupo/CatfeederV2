@@ -10,7 +10,11 @@ const port = Number(process.env.PORT ?? 3000);
 const mqttUrl = process.env.MQTT_URL ?? 'mqtt://localhost:1883';
 const mqttUsername = process.env.MQTT_USERNAME ?? 'backend';
 const mqttPassword = process.env.MQTT_PASSWORD ?? '';
-const databaseUrl = process.env.DATABASE_URL ?? 'postgres://catfeeder:catfeeder@localhost:5432/catfeeder';
+const dbHost = process.env.POSTGRES_HOST ?? 'localhost';
+const dbPort = Number(process.env.POSTGRES_PORT ?? 5432);
+const dbName = process.env.POSTGRES_DB ?? 'catfeeder';
+const dbUser = process.env.POSTGRES_USER ?? 'catfeeder';
+const dbPassword = process.env.POSTGRES_PASSWORD ?? 'catfeeder';
 
 type JsonMap = Record<string, unknown>;
 
@@ -39,7 +43,13 @@ type DeviceState = {
 
 const devices = new Map<string, DeviceState>();
 const sseClients = new Set<NodeJS.WritableStream>();
-const pool = new Pool({ connectionString: databaseUrl });
+const pool = new Pool({
+  host: dbHost,
+  port: dbPort,
+  database: dbName,
+  user: dbUser,
+  password: dbPassword,
+});
 let mqttClient: MqttClient;
 
 function nowIso() {

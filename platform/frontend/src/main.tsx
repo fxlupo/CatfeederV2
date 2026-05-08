@@ -145,7 +145,7 @@ function App() {
 
   useEffect(() => {
     if (tab === 'history') loadAudit().catch(() => undefined);
-    if (tab === 'notifications') loadPushConfig().catch(() => undefined);
+    if (tab === 'calibration') loadPushConfig().catch(() => undefined);
   }, [tab, deviceId]);
 
   const online = useMemo(() => {
@@ -205,7 +205,13 @@ function App() {
       const data = await api.get<PushConfig>('/api/push/config');
       setPushConfig(data);
     } catch { /* ignore */ }
-    // Aktuellen Push-Status prüfen
+    // iOS Safari ohne PWA: kein Web Push möglich
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isStandalone = Boolean((navigator as any).standalone);
+    if (isIOS && !isStandalone) {
+      setPushState('unsupported');
+      return;
+    }
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       setPushState('unsupported');
       return;
@@ -281,7 +287,6 @@ function App() {
         <button className={tab === 'schedule' ? 'active' : ''} onClick={() => setTab('schedule')}><CalendarClock size={18} />Zeitplan</button>
         <button className={tab === 'calibration' ? 'active' : ''} onClick={() => setTab('calibration')}><Settings size={18} />Kalibrierung</button>
         <button className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}><History size={18} />Historie</button>
-        <button className={tab === 'notifications' ? 'active' : ''} onClick={() => setTab('notifications')}><Bell size={18} />Push</button>
       </nav>
 
       {notice && <div className="notice">{notice}</div>}
@@ -387,73 +392,15 @@ function App() {
           </div>
           <button className="primary" onClick={saveConfig} disabled={!online}><Save size={18} />Speichern</button>
           {!online && <p className="muted action-note">Speichern ist offline gesperrt</p>}
+
+          <PushSection
+            pushConfig={pushConfig}
+            pushState={pushState}
+            onSubscribe={subscribePush}
+            onUnsubscribe={unsubscribePush}
+            onTest={sendPushTest}
+          />
         </Panel>
-      )}
-
-      {tab === 'notifications' && (
-        <section>
-          {pushConfig.ntfyEnabled && (
-            <Panel title="ntfy.sh" icon={<Bell size={18} />} wide>
-              <p className="muted" style={{ marginBottom: '8px' }}>
-                ntfy.sh ist aktiv. Abonniere den Kanal in der ntfy-App oder im Browser.
-              </p>
-              <div className="metric">
-                <span>Kanal-URL</span>
-                <strong><a href={pushConfig.ntfyUrl ?? ''} target="_blank" rel="noreferrer">{pushConfig.ntfyUrl}</a></strong>
-              </div>
-              <button className="secondary" onClick={sendPushTest} style={{ marginTop: '8px' }}>Testbenachrichtigung senden</button>
-            </Panel>
-          )}
-
-          {pushConfig.webPushEnabled ? (
-            <Panel title="Browser-Push (Web Push)" icon={<Bell size={18} />} wide>
-              <p className="muted" style={{ marginBottom: '8px' }}>
-                Erhält Benachrichtigungen direkt im Browser — auch wenn der Tab im Hintergrund ist.
-              </p>
-              <div className="metric"><span>Status</span>
-                <strong>
-                  {pushState === 'subscribed' && <span className="badge ok">Aktiv</span>}
-                  {pushState === 'unknown' && <span className="badge warn">Nicht aktiviert</span>}
-                  {pushState === 'denied' && <span className="badge bad">Verweigert</span>}
-                  {pushState === 'unsupported' && <span className="badge neutral">Nicht unterstützt</span>}
-                </strong>
-              </div>
-              <div className="metric"><span>Aktive Subscriptions (Server)</span><strong>{pushConfig.subscriptions ?? 0}</strong></div>
-              <div style={{ marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {pushState !== 'subscribed' && pushState !== 'unsupported' && pushState !== 'denied' && (
-                  <button className="primary" onClick={subscribePush}>Browser aktivieren</button>
-                )}
-                {pushState === 'subscribed' && (
-                  <button className="secondary" onClick={unsubscribePush}>Deaktivieren</button>
-                )}
-                <button className="secondary" onClick={sendPushTest}>Testbenachrichtigung</button>
-              </div>
-              {pushState === 'denied' && (
-                <p className="muted" style={{ marginTop: '8px' }}>Berechtigung verweigert. Bitte in den Browser-Einstellungen zurücksetzen.</p>
-              )}
-            </Panel>
-          ) : (
-            <Panel title="Browser-Push (Web Push)" icon={<Bell size={18} />} wide>
-              <p className="muted">
-                Web Push nicht konfiguriert. VAPID-Schlüssel in der Backend-Umgebung setzen:
-              </p>
-              <pre style={{ background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '4px', fontSize: '0.8em', marginTop: '8px' }}>
-                {`npx web-push generate-vapid-keys\n# Ausgabe in .env eintragen:\nVAPID_PUBLIC_KEY=...\nVAPID_PRIVATE_KEY=...\nVAPID_CONTACT=mailto:admin@example.com`}
-              </pre>
-            </Panel>
-          )}
-
-          {!pushConfig.ntfyEnabled && !pushConfig.webPushEnabled && (
-            <Panel title="ntfy.sh" icon={<Bell size={18} />} wide>
-              <p className="muted">
-                ntfy.sh nicht konfiguriert. In .env setzen:
-              </p>
-              <pre style={{ background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '4px', fontSize: '0.8em', marginTop: '8px' }}>
-                {`NTFY_URL=https://ntfy.sh/dein-eindeutiger-kanal`}
-              </pre>
-            </Panel>
-          )}
-        </section>
       )}
 
       {tab === 'history' && (
@@ -498,6 +445,83 @@ function App() {
     slots[index] = { ...slots[index], ...patch };
     updateConfigDraft({ ...configDraft, slots });
   }
+}
+
+function PushSection({
+  pushConfig,
+  pushState,
+  onSubscribe,
+  onUnsubscribe,
+  onTest,
+}: {
+  pushConfig: PushConfig;
+  pushState: string;
+  onSubscribe: () => void;
+  onUnsubscribe: () => void;
+  onTest: () => void;
+}) {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isStandalone = Boolean((navigator as any).standalone);
+  const iosNotPWA = isIOS && !isStandalone;
+
+  return (
+    <div style={{ marginTop: '24px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
+      <h3 style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px', fontSize: '0.9em' }}>
+        <Bell size={16} /> Benachrichtigungen
+      </h3>
+
+      {/* ntfy.sh */}
+      {pushConfig.ntfyEnabled ? (
+        <div className="metric" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '6px' }}>
+          <span>ntfy.sh aktiv</span>
+          <a href={pushConfig.ntfyUrl ?? ''} target="_blank" rel="noreferrer" style={{ fontSize: '0.8em', wordBreak: 'break-all' }}>
+            {pushConfig.ntfyUrl}
+          </a>
+          <button className="secondary" onClick={onTest} style={{ marginTop: '4px' }}>Testen</button>
+        </div>
+      ) : (
+        <p className="muted" style={{ fontSize: '0.82em', marginBottom: '8px' }}>
+          ntfy.sh: <code>NTFY_URL=https://ntfy.sh/&lt;kanal&gt;</code> in .env setzen.
+        </p>
+      )}
+
+      {/* Browser Push */}
+      <div style={{ marginTop: '10px' }}>
+        {iosNotPWA ? (
+          <p className="muted" style={{ fontSize: '0.82em' }}>
+            Browser-Push auf iOS: App zuerst zum Home-Bildschirm hinzufügen
+            (Teilen → „Zum Home-Bildschirm"), dann hier aktivieren.
+            Alternativ ntfy.sh über die ntfy-App nutzen.
+          </p>
+        ) : pushConfig.webPushEnabled ? (
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.82em' }}>Browser-Push:</span>
+            {pushState === 'subscribed' && (
+              <>
+                <span className="badge ok">Aktiv</span>
+                <button className="secondary" onClick={onUnsubscribe}>Deaktivieren</button>
+              </>
+            )}
+            {pushState === 'unknown' && (
+              <button className="primary" onClick={onSubscribe}>Aktivieren</button>
+            )}
+            {pushState === 'denied' && (
+              <span className="badge bad">Verweigert – in Browser-Einstellungen zurücksetzen</span>
+            )}
+            {pushState === 'unsupported' && (
+              <span className="badge neutral">Nicht unterstützt</span>
+            )}
+            <button className="secondary" onClick={onTest}>Testen</button>
+          </div>
+        ) : (
+          <p className="muted" style={{ fontSize: '0.82em' }}>
+            Browser-Push: <code>VAPID_PUBLIC/PRIVATE_KEY</code> in .env setzen
+            (<code>npx web-push generate-vapid-keys</code>).
+          </p>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function urlBase64ToUint8Array(base64: string) {

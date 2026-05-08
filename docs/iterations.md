@@ -41,6 +41,11 @@ Verifikation:
 - `pio run -e esp32dev` erfolgreich.
 - Docker/Compose konnte in dieser Shell nicht ausgefuehrt werden
   (`docker: command not found`).
+- NAS-Test erfolgreich:
+  - Firmware `1.4.0` auf dem ESP.
+  - Mosquitto, Postgres, Backend und Frontend laufen als Docker-Container.
+  - Postgres-Volume wurde fuer den ersten Test per `docker compose down -v`
+    neu initialisiert, damit `.env` Passwort und DB-User zusammenpassen.
 
 ## 2026-05-08 - MQTT-Grundlage auf ESP umgesetzt (1.3.0)
 

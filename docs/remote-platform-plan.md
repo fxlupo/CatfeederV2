@@ -500,7 +500,11 @@ Aktueller Implementierungsstand:
 - React UI:
   - Dashboard, Sofort-Fuetterung, Zeitplan, Kalibrierung, Historie, Alerts.
 - Firmware `1.4.0` unterstuetzt `cmd/config/set` fuer Remote-Konfiguration.
-- Docker/Compose-Laufzeittest ist noch offen.
+- NAS-Laufzeittest erfolgreich:
+  - Firmware `1.4.0` ist auf dem ESP.
+  - Mosquitto, Postgres, Backend und Frontend laufen als Docker-Container.
+  - Fuer den ersten Test wurde das Postgres-Volume neu initialisiert, damit die
+    `.env` Zugangsdaten sicher zum Datenbank-User passen.
 
 ### Iteration 3 - Config, Logs und Remote-Betrieb haerten
 

@@ -1,5 +1,30 @@
 # Iterationen
 
+## 2026-05-08 - MQTT-Grundlage auf ESP begonnen (1.3.0)
+
+Scope:
+
+- Firmware-Version auf `1.3.0` gesetzt.
+- `PubSubClient` als kleine MQTT-Bibliothek ergaenzt.
+- `MqttBridge` eingefuehrt:
+  - Reconnect-Loop
+  - Status-Publish
+  - Telemetrie-Publish
+  - `config/reported` Publish
+  - Feed-Event Publish
+  - Subscribe auf `cmd/feed` und `cmd/config/get`
+  - Ack/Result fuer Feed-Kommandos
+- MQTT-Konfiguration in NVS, REST-API und lokaler WebUI ergaenzt.
+- `/api/diag` um MQTT-Status erweitert.
+- Lokaler Scheduler bleibt unveraendert auf dem ESP.
+- Remote-Plattform-Plan aktualisiert.
+
+Verifikation:
+
+- `pio run -e esp32dev` erfolgreich.
+- `pio run -e esp32dev_ota` erfolgreich.
+- Noch nicht gegen einen echten Mosquitto-Broker / Remote-Feed getestet.
+
 ## 2026-05-07 - Remote-Plattform-Plan angelegt
 
 Scope:

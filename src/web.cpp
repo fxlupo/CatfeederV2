@@ -87,6 +87,9 @@ void Web::_sendSSE() {
     d["op"]  = _st->otaPort;
     d["oph"] = _st->otaPhase;
     d["oe"]  = _st->lastOtaError;
+    d["mqe"] = _st->mqttEnabled;
+    d["mqc"] = _st->mqttConnected;
+    d["mqs"] = _st->mqttState;
 
     JsonObject ir = d["ir"].to<JsonObject>();
     ir["a1"] = _st->ir1Analog;  ir["a2"] = _st->ir2Analog;
@@ -139,6 +142,10 @@ void Web::_routes() {
         d["otaPort"] = _st->otaPort;
         d["otaPhase"] = _st->otaPhase;
         d["lastOtaError"] = _st->lastOtaError;
+        d["mqttEnabled"] = _st->mqttEnabled;
+        d["mqttConnected"] = _st->mqttConnected;
+        d["mqttState"] = _st->mqttState;
+        d["mqttLastSeenS"] = _st->mqttLastSeenS;
         d["uptimeS"] = _st->uptimeS;
         d["heap"] = _st->heap;
         String j; serializeJsonPretty(d, j);
@@ -166,6 +173,10 @@ void Web::_routes() {
         d["bks"]=_c->blockReverseSteps;
         d["bkp"]=_c->blockMinRotPct;
         d["dfg"]=_c->defaultGrams;
+        JsonObject mq = d["mqtt"].to<JsonObject>();
+        mq["on"]=_c->mqttEnabled; mq["host"]=_c->mqttHost; mq["port"]=_c->mqttPort;
+        mq["user"]=_c->mqttUser; mq["pass"]=_c->mqttPass; mq["id"]=_c->mqttDeviceId;
+        mq["tls"]=_c->mqttTls;
         JsonArray wa = d["wa"].to<JsonArray>();
         for (int i = 0; i < WA_USERS; i++) {
             JsonObject u = wa.add<JsonObject>();
@@ -211,6 +222,18 @@ void Web::_routes() {
         if (!doc["bks"].isNull()) _c->blockReverseSteps = constrain((uint16_t)doc["bks"], 50, 5000);
         if (!doc["bkp"].isNull()) _c->blockMinRotPct    = constrain((uint8_t)doc["bkp"],  5, 90);
         if (!doc["dfg"].isNull()) _c->defaultGrams      = constrain((uint16_t)doc["dfg"], 1, 500);
+        if (!doc["mqtt"].isNull()) {
+            JsonObject mq = doc["mqtt"];
+            _c->mqttEnabled = mq["on"] | false;
+            strlcpy(_c->mqttHost, mq["host"] | "", sizeof(_c->mqttHost));
+            uint32_t port = mq["port"] | MQTT_DEFAULT_PORT;
+            _c->mqttPort = constrain(port, 1UL, 65535UL);
+            strlcpy(_c->mqttUser, mq["user"] | "", sizeof(_c->mqttUser));
+            strlcpy(_c->mqttPass, mq["pass"] | "", sizeof(_c->mqttPass));
+            strlcpy(_c->mqttDeviceId, mq["id"] | "catfeeder", sizeof(_c->mqttDeviceId));
+            if (strlen(_c->mqttDeviceId) == 0) strlcpy(_c->mqttDeviceId, "catfeeder", sizeof(_c->mqttDeviceId));
+            _c->mqttTls = mq["tls"] | false;
+        }
         if (!doc["wa"].isNull()) {
             JsonArray wa = doc["wa"];
             for (int i = 0; i < min((int)wa.size(), WA_USERS); i++) {

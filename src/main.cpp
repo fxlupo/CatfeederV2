@@ -10,6 +10,7 @@
 #include "sensors.h"
 #include "motors.h"
 #include "web.h"
+#include "mqtt_bridge.h"
 
 CfgManager cfgMgr;
 Config     cfg;
@@ -18,6 +19,7 @@ Sensors    sensors;
 Motors     motors;
 Web        web;
 FeedLog    feedLog;
+MqttBridge mqtt;
 
 static uint8_t lastMinute      = 255;
 static bool    dayResetDone    = false;
@@ -27,6 +29,7 @@ static bool    wasDispensing   = false;
 static bool    pendingEventValid = false;
 static uint8_t otaProgressPct  = 255;
 static FeedEvent pendingEvent;
+static char pendingMqttCmdId[40] = "";
 static const uint16_t OTA_PORT = 3232;
 static const int OTA_RECEIVE_TIMEOUT_MS = 15000;
 
@@ -251,6 +254,20 @@ static void handleWebFeedRequest() {
     startFeed(grams, servo, "web");
 }
 
+static void handleMqttFeedRequest() {
+    uint16_t grams;
+    uint8_t servo;
+    char cmdId[40];
+    if (!mqtt.consumeFeedRequest(grams, servo, cmdId, sizeof(cmdId))) return;
+    if (motors.dispensing()) {
+        mqtt.publishCommandResult(cmdId, false, "rejected", "busy");
+        return;
+    }
+    strlcpy(pendingMqttCmdId, cmdId, sizeof(pendingMqttCmdId));
+    mqtt.publishCommandResult(cmdId, true, "accepted");
+    startFeed(grams, servo, "mqtt");
+}
+
 // Flanke dispensing true→false: Feed-Counter buchen + Log-Eintrag abschließen
 static void checkFeedComplete() {
     bool nowDispensing = motors.dispensing();
@@ -278,7 +295,13 @@ static void checkFeedComplete() {
             pendingEvent.feedAborted    = motors.feedAborted();
             pendingEvent.blockRetryCount= motors.blockRetries();
             feedLog.add(pendingEvent);
+            mqtt.publishFeedEvent(pendingEvent);
             pendingEventValid = false;
+        }
+        if (strlen(pendingMqttCmdId) > 0) {
+            mqtt.publishCommandResult(pendingMqttCmdId, !motors.feedAborted(),
+                                      motors.feedAborted() ? "aborted" : "done");
+            pendingMqttCmdId[0] = '\0';
         }
     }
     wasDispensing = nowDispensing;
@@ -304,6 +327,7 @@ void setup() {
     refreshStatus();
 
     web.begin(cfg, statusData, sensors, motors, cfgMgr, feedLog);
+    mqtt.begin(cfg, statusData);
     syncNTP();
     beginOTA();
 
@@ -316,7 +340,9 @@ void loop() {
     motors.loop();
     refreshStatus();
     web.loop();
+    mqtt.loop();
     handleWebFeedRequest();
+    handleMqttFeedRequest();
     checkFeedComplete();
     schedulerLoop();
     yield();

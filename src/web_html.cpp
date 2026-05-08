@@ -231,6 +231,19 @@ label{font-size:.75em;color:var(--t2);display:block;margin-top:6px}
 <label>Passwort</label><input type="password" id="wp" placeholder="WLAN-Passwort">
 <button class="bt b1" onclick="swf()" style="margin-top:8px">&#x1F4F6; Speichern &amp; Neustart</button></div>
 
+<div class="cd"><h3>MQTT</h3>
+<label style="display:flex;align-items:center;gap:8px;margin-top:6px">
+<label class="sw"><input type="checkbox" id="mqe"><span></span></label>Aktiv</label>
+<div class="g2">
+<div><label>Broker Host</label><input type="text" id="mqh" placeholder="192.168.1.10 oder broker.local" maxlength="64"></div>
+<div><label>Port</label><input type="number" id="mqp" value="1883" min="1" max="65535"></div>
+<div><label>Device ID</label><input type="text" id="mqd" value="catfeeder" maxlength="32"></div>
+<div><label>User</label><input type="text" id="mqu" maxlength="32"></div>
+<div><label>Passwort/Token</label><input type="password" id="mqw" maxlength="64"></div>
+<div><label>TLS</label><select id="mqt"><option value="0">Aus</option><option value="1">Später</option></select></div>
+</div>
+<p style="font-size:.72em;color:var(--t2);margin-top:4px">TLS ist vorbereitet, aber in Iteration 1 noch nicht aktiv implementiert.</p></div>
+
 <div class="cd"><h3>&#x1F570; Uhrzeit</h3>
 <div class="sr"><span>RTC</span><span id="rt">--:--:--</span></div>
 <button class="bt b2" onclick="syn()">&#x1F504; Vom Handy synchronisieren</button></div>
@@ -319,6 +332,10 @@ async function lc(){
   $('r2').value=C.s2o; $('r2v').textContent=C.s2o+'°';
   $('tz').value=C.tz;  $('ds').checked=C.dst;
   $('hn').value=C.hn;  $('hp').textContent=C.hn;
+  const mq=C.mqtt||{};
+  $('mqe').checked=!!mq.on; $('mqh').value=mq.host||''; $('mqp').value=mq.port||1883;
+  $('mqd').value=mq.id||'catfeeder'; $('mqu').value=mq.user||''; $('mqw').value=mq.pass||'';
+  $('mqt').value=mq.tls?1:0;
   buildWA();
 }
 function tg(i,v){C.slots[i].on=v;$('s'+i).className='sl '+(v?'':'off');}
@@ -362,6 +379,8 @@ async function sav(){
   C.feM=+$('ce').value; C.ffM=+$('cf').value;
   C.tz=+$('tz').value;  C.dst=$('ds').checked;
   C.hn=$('hn').value;
+  C.mqtt={on:$('mqe').checked,host:$('mqh').value,port:+$('mqp').value,
+    id:$('mqd').value,user:$('mqu').value,pass:$('mqw').value,tls:$('mqt').value==='1'};
   C.wa=waToPayload();
   const r=await api('/api/config',C);
   if(r&&r.ok)msg('Gespeichert ✓');}

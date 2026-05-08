@@ -45,6 +45,13 @@ void CfgManager::defaults(Config &c) {
         c.waUsers[i].apikey[0] = '\0';
     }
     c.defaultGrams     = DEFAULT_FEED_GRAMS;
+    c.mqttEnabled      = false;
+    c.mqttHost[0]      = '\0';
+    c.mqttPort         = MQTT_DEFAULT_PORT;
+    c.mqttUser[0]      = '\0';
+    c.mqttPass[0]      = '\0';
+    strlcpy(c.mqttDeviceId, "catfeeder", sizeof(c.mqttDeviceId));
+    c.mqttTls          = false;
     c.utcOffset        = 1;
     c.dst              = true;
     strlcpy(c.ssid,     WIFI_DEFAULT_SSID, sizeof(c.ssid));
@@ -92,6 +99,14 @@ void CfgManager::save(const Config &c) {
     _p.putBool(  "dst", c.dst);
     _p.putString("hn",  c.hostname);
     _p.putUShort("dfg", c.defaultGrams);
+    // MQTT
+    _p.putBool(  "mqe", c.mqttEnabled);
+    _p.putString("mqh", c.mqttHost);
+    _p.putUShort("mqp", c.mqttPort);
+    _p.putString("mqu", c.mqttUser);
+    _p.putString("mqw", c.mqttPass);
+    _p.putString("mqd", c.mqttDeviceId);
+    _p.putBool(  "mqt", c.mqttTls);
     for (int i = 0; i < WA_USERS; i++) {
         char k[6];
         sprintf(k, "w%da", i); _p.putBool(k,   c.waUsers[i].active);
@@ -152,6 +167,15 @@ void CfgManager::load(Config &c) {
     c.dst           = _p.getBool(  "dst", c.dst);
     { String s = _p.getString("hn", c.hostname); strlcpy(c.hostname, s.c_str(), sizeof(c.hostname)); }
     c.defaultGrams  = _p.getUShort("dfg", c.defaultGrams);
+    c.mqttEnabled   = _p.getBool(  "mqe", c.mqttEnabled);
+    { String s = _p.getString("mqh", c.mqttHost); strlcpy(c.mqttHost, s.c_str(), sizeof(c.mqttHost)); }
+    c.mqttPort      = _p.getUShort("mqp", c.mqttPort);
+    { String s = _p.getString("mqu", c.mqttUser); strlcpy(c.mqttUser, s.c_str(), sizeof(c.mqttUser)); }
+    { String s = _p.getString("mqw", c.mqttPass); strlcpy(c.mqttPass, s.c_str(), sizeof(c.mqttPass)); }
+    { String s = _p.getString("mqd", c.mqttDeviceId); strlcpy(c.mqttDeviceId, s.c_str(), sizeof(c.mqttDeviceId)); }
+    c.mqttTls       = _p.getBool(  "mqt", c.mqttTls);
+    if (c.mqttPort == 0) c.mqttPort = MQTT_DEFAULT_PORT;
+    if (strlen(c.mqttDeviceId) == 0) strlcpy(c.mqttDeviceId, c.hostname, sizeof(c.mqttDeviceId));
     for (int i = 0; i < WA_USERS; i++) {
         char k[6];
         sprintf(k, "w%da", i); c.waUsers[i].active = _p.getBool(k, false);

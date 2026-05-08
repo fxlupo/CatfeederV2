@@ -16,6 +16,8 @@
   ruhigen Motorlauf.
 - `web.*`: WLAN/AP-Fallback, mDNS, REST-API und SSE-Liveupdates.
 - `web_html.cpp`: Eingebettete lokale Weboberflaeche.
+- `mqtt_bridge.*`: Ausgehende MQTT-Anbindung fuer Remote-Plattform, Status,
+  Telemetrie, Feed-Events und erste Remote-Kommandos.
 - `tools/stepper_as5600_calibration.cpp`: Separates Kalibrier-/Testprogramm,
   wird von PlatformIO nicht als Firmware gebaut.
 
@@ -49,6 +51,7 @@ als kompletter Struct-Blob gespeichert, sondern unter einzelnen Keys:
 - Füllstands- und IR-Grenzen
 - WhatsApp-Empfaenger
 - Standardmenge fuer manuelles Fuettern
+- MQTT Broker, Device-ID und Zugangsdaten
 
 Neue Felder bekommen beim ersten Lesen ihren Default. Bestehende Werte bleiben
 bei OTA-Updates erhalten, solange ihre NVS-Keys weiter verwendet werden.
@@ -99,6 +102,27 @@ Wichtige API-Endpunkte:
 - `POST /api/time`: RTC setzen
 - `POST /api/wifi`: WLAN speichern und neu starten
 - `GET /api/log`: RAM-Ringpuffer der letzten Fuetterungen
+
+## MQTT Remote-Anbindung
+
+Der ESP kann optional eine ausgehende MQTT-Verbindung zu einem Broker aufbauen.
+Die Konfiguration ist lokal ueber WebUI/REST speicherbar und bleibt im NVS.
+
+Basis-Topics:
+
+- `catfeeder/{deviceId}/status`
+- `catfeeder/{deviceId}/telemetry`
+- `catfeeder/{deviceId}/config/reported`
+- `catfeeder/{deviceId}/event`
+- `catfeeder/{deviceId}/feed/log`
+- `catfeeder/{deviceId}/cmd/feed`
+- `catfeeder/{deviceId}/cmd/config/get`
+- `catfeeder/{deviceId}/cmd/ack`
+- `catfeeder/{deviceId}/cmd/result`
+
+Iteration 1 nutzt `PubSubClient` ohne TLS. TLS ist in der Config vorbereitet,
+aber noch nicht aktiv. Der Scheduler bleibt lokal auf dem ESP; MQTT-Kommandos
+koennen eine manuelle Fütterung ausloesen und bekommen Ack/Result.
 
 ## Fütterungsablauf
 

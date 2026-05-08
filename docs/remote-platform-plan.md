@@ -1,6 +1,6 @@
 # Remote-Plattform-Plan
 
-Status: Arbeitsdokument  
+Status: Iteration 1 Firmware-Grundlage umgesetzt, Broker-Test offen
 Ziel: Dieser Plan wird waehrend der Umsetzung laufend aktualisiert und bleibt
 der fuehrende Implementierungsplan fuer Remote-Zugriff, externe UI und Backend.
 
@@ -383,6 +383,8 @@ gesendet werden, nicht vom ESP.
 
 ### Iteration 1 - MQTT-Grundlage auf ESP
 
+Status: Firmware umgesetzt, Broker-/Hardware-Test offen
+
 Ziel:
 
 - ESP kann ausgehend MQTT sprechen.
@@ -412,6 +414,25 @@ Umfang:
 - Ack/Result-Mechanismus fuer Kommandos.
 - Serial-Diagnose und `/api/diag` um MQTT-Status erweitern.
 - Dokumentation aktualisieren.
+
+Aktueller Implementierungsstand:
+
+- MQTT Library: `PubSubClient`.
+- TLS ist als Config-Feld vorbereitet, aber in Iteration 1 noch nicht aktiv.
+- MQTT-Konfiguration ist in NVS, REST-API und lokaler WebUI vorhanden.
+- ESP publisht:
+  - `status`
+  - `telemetry`
+  - `config/reported`
+  - `event`
+  - `feed/log`
+- ESP subscribed:
+  - `cmd/feed`
+  - `cmd/config/get`
+- Feed-Kommandos nutzen Ack/Result.
+- Aenderungen der `deviceId` werden ohne Neustart in neue MQTT-Topics
+  uebernommen.
+- Scheduler bleibt lokal.
 
 Akzeptanz:
 

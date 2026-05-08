@@ -6,8 +6,8 @@
 #include <Preferences.h>
 
 // ─── Firmware ───────────────────────────────────────────────────────────────
-#define FW_VERSION             "1.2.3"
-#define CONFIG_SCHEMA_VERSION  8
+#define FW_VERSION             "1.3.0"
+#define CONFIG_SCHEMA_VERSION  9
 
 // ─── WLAN ───────────────────────────────────────────────────────────────────
 #define WIFI_AP_SSID           "CatFeeder-Setup"
@@ -59,6 +59,11 @@
 #define DEFAULT_STEPS_PER_GRAM 300     // Stepper-Schritte pro Gramm
 #define DEFAULT_FEED_GRAMS     20      // Standard-Fütterungsmenge g
 #define FEED_LOG_SIZE          20      // Einträge im RAM-Ringpuffer
+
+// ─── MQTT ──────────────────────────────────────────────────────────────────
+#define MQTT_DEFAULT_PORT      1883
+#define MQTT_STATUS_INTERVAL   5000    // ms
+#define MQTT_TELEMETRY_INTERVAL 10000  // ms
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Datenstrukturen
@@ -125,6 +130,15 @@ struct Config {
 
     // Fütterung
     uint16_t defaultGrams;   // Standard-Menge für manuelles Füttern
+
+    // MQTT / Remote-Plattform
+    bool     mqttEnabled;
+    char     mqttHost[65];
+    uint16_t mqttPort;
+    char     mqttUser[33];
+    char     mqttPass[65];
+    char     mqttDeviceId[33];
+    bool     mqttTls;
 };
 
 struct Status {
@@ -169,6 +183,12 @@ struct Status {
     uint32_t feeds;          // Gesamtfütterungen
     bool     overcurrent;
     bool     fillLow;
+
+    // MQTT
+    bool     mqttEnabled;
+    bool     mqttConnected;
+    char     mqttState[16];
+    uint32_t mqttLastSeenS;
 };
 
 // ═════════════════════════════════════════════════════════════════════════════

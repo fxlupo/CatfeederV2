@@ -37,6 +37,8 @@ type Config = {
 };
 type Device = {
   id: string;
+  online?: boolean;
+  ageSeconds?: number | null;
   seenAt?: string;
   status?: Record<string, any>;
   telemetry?: Record<string, any>;
@@ -92,9 +94,10 @@ function App() {
   }, [deviceId]);
 
   const online = useMemo(() => {
+    if (typeof device.online === 'boolean') return device.online;
     if (!device.seenAt) return false;
     return Date.now() - new Date(device.seenAt).getTime() < 30000;
-  }, [device.seenAt]);
+  }, [device.online, device.seenAt]);
 
   async function feedNow() {
     await api.send(`/api/devices/${deviceId}/feed`, 'POST', { grams: feedGrams, servo: feedServo });
@@ -111,7 +114,7 @@ function App() {
       <header className="topbar">
         <div>
           <h1>CatFeeder</h1>
-          <p>{online ? 'Online' : 'Wartet auf Device'} · {device.status?.fw ?? device.config?.fw ?? 'Firmware unbekannt'}</p>
+          <p>{online ? 'Online' : 'Offline'} · {device.status?.fw ?? device.config?.fw ?? 'Firmware unbekannt'} · zuletzt {formatAge(device.ageSeconds)}</p>
         </div>
         <label className="device-picker">
           <span>Device</span>
@@ -135,6 +138,7 @@ function App() {
             <Metric label="Uptime" value={`${device.status?.uptimeS ?? '-'} s`} />
             <Metric label="Heap" value={`${device.status?.heap ?? '-'} B`} />
             <Metric label="IP" value={device.status?.ip ?? '-'} />
+            <Metric label="Status" value={<span className={`badge ${online ? 'ok' : 'warn'}`}>{online ? 'online' : 'offline'}</span>} />
           </Panel>
 
           <Panel title="Telemetrie" icon={<Gauge size={18} />}>
@@ -154,9 +158,24 @@ function App() {
 
           <Panel title="Alerts" icon={<AlertTriangle size={18} />}>
             {(device.alerts ?? []).slice(-5).reverse().map((alert, index) => (
-              <div className="event danger" key={index}>{alert.message ?? alert.type}</div>
+              <div className={`event ${alert.level === 'critical' ? 'danger' : 'warn'}`} key={index}>
+                <strong>{alert.type ?? 'alert'}</strong>
+                <span>{alert.message ?? '-'}</span>
+                <small>{formatDate(alert.createdAt)}</small>
+              </div>
             ))}
             {(device.alerts ?? []).length === 0 && <p className="muted">Keine Alerts</p>}
+          </Panel>
+
+          <Panel title="Commands" icon={<Activity size={18} />}>
+            {(device.commands ?? []).slice(-5).reverse().map((command, index) => (
+              <div className={`command ${command.state ?? 'queued'}`} key={index}>
+                <span className={`badge ${commandStateClass(command.state)}`}>{command.state ?? '-'}</span>
+                <strong>{command.type ?? '-'}</strong>
+                <small>{formatDate(command.updatedAt)}</small>
+              </div>
+            ))}
+            {(device.commands ?? []).length === 0 && <p className="muted">Keine Commands</p>}
           </Panel>
         </section>
       )}
@@ -215,6 +234,29 @@ function App() {
     slots[index] = { ...slots[index], ...patch };
     setConfigDraft({ ...configDraft, slots });
   }
+}
+
+function commandStateClass(state?: string) {
+  if (state === 'done' || state === 'accepted') return 'ok';
+  if (state === 'timeout' || state === 'aborted' || state === 'rejected') return 'bad';
+  return 'warn';
+}
+
+function formatAge(seconds?: number | null) {
+  if (seconds === null || seconds === undefined) return 'nie';
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.round(seconds / 60)}min`;
+}
+
+function formatDate(value?: string) {
+  if (!value) return '';
+  return new Date(value).toLocaleString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 }
 
 function normalizeConfig(config?: Config): Config {

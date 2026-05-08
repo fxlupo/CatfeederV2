@@ -61,6 +61,13 @@ Verifikation:
   - `/api/config` auf dem ESP zeigt dieselbe Slot-Konfiguration wie das
     Backend.
   - Der geaenderte Scheduler-Slot hat automatisch eine Fuetterung ausgeloest.
+- Backend/UI-Haertung begonnen:
+  - API liefert `online` und `ageSeconds` pro Device.
+  - Backend erzeugt Offline-Alerts mit Anti-Spam, wenn ein Device laenger als
+    30 Sekunden nicht gesehen wurde.
+  - Haengende Commands wechseln nach Timeout auf `timeout`.
+  - Device-Ansicht hydriert Commands aus Postgres nach Backend-Neustart.
+  - React UI zeigt Command-Status und Alerts mit klaren Status-Badges.
 
 ## 2026-05-08 - MQTT-Grundlage auf ESP umgesetzt (1.3.0)
 

@@ -519,6 +519,11 @@ Aktueller Implementierungsstand:
   - ESP speichert persistent
   - Backend und ESP-REST zeigen dieselbe Slot-Konfiguration
   - Scheduler hat den geaenderten Slot automatisch ausgefuehrt.
+- Erste Haertung:
+  - Backend berechnet `online`/`ageSeconds`.
+  - Offline-Alerts werden erzeugt.
+  - Command-Timeouts werden sichtbar.
+  - UI zeigt Command-Status und Alerts klarer.
 
 ### Iteration 3 - Config, Logs und Remote-Betrieb haerten
 

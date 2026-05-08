@@ -15,6 +15,8 @@ const dbPort = Number(process.env.POSTGRES_PORT ?? 5432);
 const dbName = process.env.POSTGRES_DB ?? 'catfeeder';
 const dbUser = process.env.POSTGRES_USER ?? 'catfeeder';
 const dbPassword = process.env.POSTGRES_PASSWORD ?? 'catfeeder';
+const offlineAfterMs = Number(process.env.DEVICE_OFFLINE_AFTER_MS ?? 30000);
+const commandTimeoutMs = Number(process.env.COMMAND_TIMEOUT_MS ?? 120000);
 
 type JsonMap = Record<string, unknown>;
 
@@ -43,6 +45,7 @@ type DeviceState = {
 
 const devices = new Map<string, DeviceState>();
 const sseClients = new Set<NodeJS.WritableStream>();
+const offlineAlerted = new Set<string>();
 const pool = new Pool({
   host: dbHost,
   port: dbPort,
@@ -68,7 +71,22 @@ function getDevice(deviceId: string) {
 function markDeviceSeen(deviceId: string) {
   const device = getDevice(deviceId);
   device.seenAt = nowIso();
+  offlineAlerted.delete(deviceId);
   return device;
+}
+
+function isOnline(device: DeviceState) {
+  if (!device.seenAt) return false;
+  return Date.now() - new Date(device.seenAt).getTime() <= offlineAfterMs;
+}
+
+function serializeDevice(device: DeviceState) {
+  const ageMs = device.seenAt ? Date.now() - new Date(device.seenAt).getTime() : undefined;
+  return {
+    ...device,
+    online: isOnline(device),
+    ageSeconds: ageMs === undefined ? null : Math.max(0, Math.round(ageMs / 1000)),
+  };
 }
 
 function sendEvent(event: string, data: unknown) {
@@ -153,7 +171,7 @@ async function logCommand(command: CommandState) {
 
 async function createAlert(deviceId: string, level: string, type: string, message: string, payload: JsonMap) {
   const alert = { id: randomUUID(), deviceId, level, type, message, createdAt: nowIso(), payload };
-  const device = markDeviceSeen(deviceId);
+  const device = getDevice(deviceId);
   device.alerts.push(alert);
   trim(device.alerts, 50);
   await pool.query(
@@ -161,6 +179,34 @@ async function createAlert(deviceId: string, level: string, type: string, messag
     [deviceId, level, type, message, payload],
   );
   sendEvent('alert', alert);
+}
+
+async function checkOfflineDevices() {
+  for (const device of devices.values()) {
+    if (!device.seenAt || isOnline(device) || offlineAlerted.has(device.id)) continue;
+    offlineAlerted.add(device.id);
+    await createAlert(device.id, 'warning', 'device_offline', 'Device offline', {
+      seenAt: device.seenAt,
+      ageSeconds: Math.round((Date.now() - new Date(device.seenAt).getTime()) / 1000),
+    });
+    sendEvent('device', serializeDevice(device));
+  }
+}
+
+async function checkCommandTimeouts() {
+  const activeStates = new Set(['queued', 'accepted']);
+  for (const device of devices.values()) {
+    for (const command of device.commands) {
+      if (!activeStates.has(command.state)) continue;
+      if (Date.now() - new Date(command.updatedAt).getTime() < commandTimeoutMs) continue;
+      command.state = 'timeout';
+      command.ok = false;
+      command.message = 'command-timeout';
+      command.updatedAt = nowIso();
+      await logCommand(command);
+      sendEvent('command', command);
+    }
+  }
 }
 
 function rememberCommand(command: CommandState) {
@@ -205,6 +251,14 @@ async function hydrateDevice(deviceId: string) {
     device.alerts = rows.rows.map((row) => ({ ...row.payload, level: row.level, type: row.type, message: row.message, createdAt: row.createdAt }));
   }
 
+  if (device.commands.length === 0) {
+    const rows = await pool.query(
+      'select id, device_id as "deviceId", type, state, ok, message, created_at as "createdAt", updated_at as "updatedAt", payload from command_log where device_id = $1 order by updated_at desc limit 50',
+      [deviceId],
+    );
+    device.commands = rows.rows.reverse();
+  }
+
   return device;
 }
 
@@ -221,12 +275,12 @@ async function handleMqttMessage(topic: string, raw: Buffer) {
     return;
   }
 
-  const device = getDevice(deviceId);
+  const device = markDeviceSeen(deviceId);
 
   if (channel === 'status') {
     device.status = payload;
     await upsertDevice(deviceId, 'status', payload);
-    sendEvent('device', { deviceId, status: payload, seenAt: device.seenAt });
+    sendEvent('device', serializeDevice(device));
     return;
   }
 
@@ -234,7 +288,7 @@ async function handleMqttMessage(topic: string, raw: Buffer) {
     device.telemetry = payload;
     await upsertDevice(deviceId, 'telemetry', payload);
     await pool.query('insert into telemetry (device_id, payload) values ($1, $2)', [deviceId, payload]);
-    sendEvent('telemetry', { deviceId, telemetry: payload });
+    sendEvent('telemetry', serializeDevice(device));
     if (payload.fillLow === true) await createAlert(deviceId, 'warning', 'fill_low', 'Fuellstand niedrig', payload);
     if (payload.overcurrent === true) await createAlert(deviceId, 'critical', 'overcurrent', 'Ueberstrom erkannt', payload);
     return;
@@ -243,7 +297,7 @@ async function handleMqttMessage(topic: string, raw: Buffer) {
   if (channel === 'config/reported') {
     device.config = payload;
     await upsertDevice(deviceId, 'config_reported', payload);
-    sendEvent('config', { deviceId, config: payload });
+    sendEvent('config', serializeDevice(device));
     return;
   }
 
@@ -253,7 +307,7 @@ async function handleMqttMessage(topic: string, raw: Buffer) {
       trim(device.feedLog, 100);
       await pool.query('insert into feed_events (device_id, payload) values ($1, $2)', [deviceId, payload]);
     }
-    sendEvent('feed', { deviceId, event: payload });
+    sendEvent('feed', serializeDevice(device));
     if (payload.aborted === true || payload.type === 'feed_aborted') {
       await createAlert(deviceId, 'critical', 'feed_aborted', 'Fuetterung abgebrochen', payload);
     }
@@ -310,6 +364,10 @@ async function startMqtt() {
 async function main() {
   await initDb();
   await startMqtt();
+  setInterval(() => {
+    checkOfflineDevices().catch((err) => console.error('[offline-check]', err));
+    checkCommandTimeouts().catch((err) => console.error('[command-timeout]', err));
+  }, 5000);
 
   const app = Fastify({ logger: true });
   await app.register(cors, { origin: true });
@@ -318,6 +376,8 @@ async function main() {
     ok: true,
     mqttConnected: mqttClient.connected,
     devices: devices.size,
+    offlineAfterMs,
+    commandTimeoutMs,
   }));
 
   app.get('/api/events', async (_request, reply) => {
@@ -332,11 +392,12 @@ async function main() {
     reply.raw.on('close', () => sseClients.delete(reply.raw));
   });
 
-  app.get('/api/devices', async () => Array.from(devices.values()));
+  app.get('/api/devices', async () => Array.from(devices.values()).map(serializeDevice));
 
   app.get('/api/devices/:id', async (request) => {
     const { id } = request.params as { id: string };
-    return hydrateDevice(id);
+    const device = await hydrateDevice(id);
+    return serializeDevice(device);
   });
 
   app.get('/api/devices/:id/telemetry', async (request) => {

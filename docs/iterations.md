@@ -27,6 +27,9 @@ Scope:
 - `platform/README.md` mit Start- und Betriebsnotizen angelegt.
 - Mosquitto-Image auf `eclipse-mosquitto:2` gesetzt, da `2.1` kein gueltiger
   Docker-Hub-Tag ist.
+- Mosquitto Passwortdatei und ACL werden nun unter `/mosquitto/data` erzeugt
+  und dem Container-User `mosquitto` uebergeben, damit der Broker sie nach dem
+  Drop auf den nicht-root User lesen kann.
 
 Verifikation:
 

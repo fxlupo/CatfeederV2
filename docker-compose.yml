@@ -18,9 +18,12 @@ services:
       - /bin/sh
       - -c
       - |
-        mosquitto_passwd -b -c /tmp/mosquitto_passwords "$$MQTT_DEVICE_USER" "$$MQTT_DEVICE_PASS"
-        mosquitto_passwd -b /tmp/mosquitto_passwords "$$MQTT_BACKEND_USER" "$$MQTT_BACKEND_PASS"
-        printf "user %s\ntopic readwrite catfeeder/%s/#\n\nuser %s\ntopic readwrite catfeeder/#\n" "$$MQTT_DEVICE_USER" "$$MQTT_DEVICE_ID" "$$MQTT_BACKEND_USER" > /tmp/mosquitto_acl
+        rm -f /mosquitto/data/mosquitto_passwords /mosquitto/data/mosquitto_acl
+        mosquitto_passwd -b -c /mosquitto/data/mosquitto_passwords "$$MQTT_DEVICE_USER" "$$MQTT_DEVICE_PASS"
+        mosquitto_passwd -b /mosquitto/data/mosquitto_passwords "$$MQTT_BACKEND_USER" "$$MQTT_BACKEND_PASS"
+        printf "user %s\ntopic readwrite catfeeder/%s/#\n\nuser %s\ntopic readwrite catfeeder/#\n" "$$MQTT_DEVICE_USER" "$$MQTT_DEVICE_ID" "$$MQTT_BACKEND_USER" > /mosquitto/data/mosquitto_acl
+        chown mosquitto:mosquitto /mosquitto/data/mosquitto_passwords /mosquitto/data/mosquitto_acl
+        chmod 640 /mosquitto/data/mosquitto_passwords /mosquitto/data/mosquitto_acl
         exec mosquitto -c /mosquitto/config/mosquitto.conf
 
   db:

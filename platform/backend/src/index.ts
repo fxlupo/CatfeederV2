@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 
 const { Pool } = pg;
 
-const platformVersion = '0.3.1';
+const platformVersion = '0.4.0';
 const port = Number(process.env.PORT ?? 3000);
 const mqttUrl = process.env.MQTT_URL ?? 'mqtt://localhost:1883';
 const mqttUsername = process.env.MQTT_USERNAME ?? 'backend';
@@ -33,12 +33,24 @@ type CommandState = {
   payload: JsonMap;
 };
 
+type ConfigSync = {
+  state: 'unknown' | 'synced' | 'pending' | 'drift';
+  desiredUpdatedAt?: string;
+  reportedUpdatedAt?: string;
+  desiredHash?: string;
+  reportedHash?: string;
+  commandId?: string;
+  message?: string;
+};
+
 type DeviceState = {
   id: string;
   seenAt?: string;
   status?: JsonMap;
   telemetry?: JsonMap;
   config?: JsonMap;
+  configDesired?: JsonMap;
+  configSync?: ConfigSync;
   feedLog: JsonMap[];
   alerts: JsonMap[];
   commands: CommandState[];
@@ -83,6 +95,7 @@ function isOnline(device: DeviceState) {
 }
 
 function serializeDevice(device: DeviceState) {
+  updateConfigSync(device);
   const ageMs = device.seenAt ? Date.now() - new Date(device.seenAt).getTime() : undefined;
   return {
     ...device,
@@ -100,6 +113,65 @@ function trim<T>(items: T[], limit: number) {
   if (items.length > limit) items.splice(0, items.length - limit);
 }
 
+function normalizeForCompare(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(normalizeForCompare);
+  if (!value || typeof value !== 'object') return value;
+  const source = value as JsonMap;
+  return Object.keys(source)
+    .filter((key) => key !== 'fw')
+    .sort()
+    .reduce<JsonMap>((result, key) => {
+      result[key] = normalizeForCompare(source[key]);
+      return result;
+    }, {});
+}
+
+function configHash(config?: JsonMap) {
+  if (!config) return undefined;
+  return JSON.stringify(normalizeForCompare(config));
+}
+
+function updateConfigSync(device: DeviceState) {
+  const desiredHash = configHash(device.configDesired);
+  const reportedHash = configHash(device.config);
+  const prior = device.configSync;
+
+  if (!desiredHash && !reportedHash) {
+    device.configSync = { state: 'unknown', message: 'no-config' };
+    return;
+  }
+
+  if (!desiredHash) {
+    device.configSync = {
+      state: 'synced',
+      reportedHash,
+      reportedUpdatedAt: prior?.reportedUpdatedAt,
+      message: 'reported-only',
+    };
+    return;
+  }
+
+  if (!reportedHash) {
+    device.configSync = {
+      ...prior,
+      state: 'pending',
+      desiredHash,
+      reportedHash,
+      message: 'waiting-for-reported-config',
+    };
+    return;
+  }
+
+  const state = desiredHash === reportedHash ? 'synced' : prior?.state === 'pending' ? 'pending' : 'drift';
+  device.configSync = {
+    ...prior,
+    state,
+    desiredHash,
+    reportedHash,
+    message: state === 'synced' ? 'desired-matches-reported' : 'desired-differs-from-reported',
+  };
+}
+
 async function initDb() {
   await pool.query(`
     create table if not exists devices (
@@ -107,7 +179,10 @@ async function initDb() {
       last_seen timestamptz,
       status jsonb,
       telemetry jsonb,
-      config_reported jsonb
+      config_reported jsonb,
+      config_desired jsonb,
+      config_desired_at timestamptz,
+      config_reported_at timestamptz
     );
 
     create table if not exists telemetry (
@@ -146,6 +221,10 @@ async function initDb() {
       payload jsonb not null
     );
   `);
+
+  await pool.query('alter table devices add column if not exists config_desired jsonb');
+  await pool.query('alter table devices add column if not exists config_desired_at timestamptz');
+  await pool.query('alter table devices add column if not exists config_reported_at timestamptz');
 }
 
 async function upsertDevice(deviceId: string, field: 'status' | 'telemetry' | 'config_reported', payload: JsonMap) {
@@ -154,6 +233,18 @@ async function upsertDevice(deviceId: string, field: 'status' | 'telemetry' | 'c
      values ($1, now(), $2)
      on conflict (id) do update set last_seen = now(), ${field} = excluded.${field}`,
     [deviceId, payload],
+  );
+  if (field === 'config_reported') {
+    await pool.query('update devices set config_reported_at = now() where id = $1', [deviceId]);
+  }
+}
+
+async function storeDesiredConfig(deviceId: string, config: JsonMap) {
+  await pool.query(
+    `insert into devices (id, config_desired, config_desired_at)
+     values ($1, $2, now())
+     on conflict (id) do update set config_desired = excluded.config_desired, config_desired_at = now()`,
+    [deviceId, config],
   );
 }
 
@@ -205,6 +296,13 @@ async function checkCommandTimeouts() {
       command.ok = false;
       command.message = 'command-timeout';
       command.updatedAt = nowIso();
+      if (command.type === 'config' && device.configSync?.commandId === command.id) {
+        device.configSync = {
+          ...device.configSync,
+          state: 'drift',
+          message: 'config-command-timeout',
+        };
+      }
       await logCommand(command);
       sendEvent('command', command);
     }
@@ -263,7 +361,15 @@ async function rejectCommand(deviceId: string, type: 'feed' | 'config', message:
 async function hydrateDevice(deviceId: string) {
   const device = getDevice(deviceId);
   const stored = await pool.query(
-    'select last_seen as "lastSeen", status, telemetry, config_reported as "configReported" from devices where id = $1',
+    `select
+       last_seen as "lastSeen",
+       status,
+       telemetry,
+       config_reported as "configReported",
+       config_desired as "configDesired",
+       config_desired_at as "configDesiredAt",
+       config_reported_at as "configReportedAt"
+     from devices where id = $1`,
     [deviceId],
   );
   if (stored.rows[0]) {
@@ -271,6 +377,13 @@ async function hydrateDevice(deviceId: string) {
     device.status ??= stored.rows[0].status ?? undefined;
     device.telemetry ??= stored.rows[0].telemetry ?? undefined;
     device.config ??= stored.rows[0].configReported ?? undefined;
+    device.configDesired ??= stored.rows[0].configDesired ?? undefined;
+    device.configSync = {
+      ...device.configSync,
+      state: device.configSync?.state ?? 'unknown',
+      desiredUpdatedAt: stored.rows[0].configDesiredAt?.toISOString?.(),
+      reportedUpdatedAt: stored.rows[0].configReportedAt?.toISOString?.(),
+    };
   }
 
   if (device.feedLog.length === 0) {
@@ -297,6 +410,7 @@ async function hydrateDevice(deviceId: string) {
     device.commands = rows.rows.reverse();
   }
 
+  updateConfigSync(device);
   return device;
 }
 
@@ -335,6 +449,12 @@ async function handleMqttMessage(topic: string, raw: Buffer) {
   if (channel === 'config/reported') {
     device.config = payload;
     await upsertDevice(deviceId, 'config_reported', payload);
+    device.configSync = {
+      ...device.configSync,
+      state: device.configSync?.state ?? 'unknown',
+      reportedUpdatedAt: nowIso(),
+    };
+    updateConfigSync(device);
     sendEvent('config', serializeDevice(device));
     return;
   }
@@ -368,6 +488,13 @@ async function handleMqttMessage(topic: string, raw: Buffer) {
       payload: prior?.payload ?? payload,
     };
     rememberCommand(command);
+    if (command.type === 'config' && command.ok === false && device.configSync?.commandId === command.id) {
+      device.configSync = {
+        ...device.configSync,
+        state: 'drift',
+        message: command.message || 'config-command-failed',
+      };
+    }
     await logCommand(command);
     sendEvent('command', command);
   }
@@ -501,6 +628,7 @@ async function main() {
       return rejectCommand(id, 'config', 'device-offline');
     }
     const config = (request.body ?? {}) as JsonMap;
+    await storeDesiredConfig(id, config);
     const command: CommandState = {
       id: randomUUID(),
       deviceId: id,
@@ -511,6 +639,15 @@ async function main() {
       payload: { id: '', type: 'config_set', config, source: 'remote-ui', issuedAt: nowIso() },
     };
     command.payload.id = command.id;
+    device.configDesired = config;
+    device.configSync = {
+      ...device.configSync,
+      state: 'pending',
+      desiredUpdatedAt: nowIso(),
+      commandId: command.id,
+      message: 'waiting-for-device-report',
+    };
+    updateConfigSync(device);
     rememberCommand(command);
     await logCommand(command);
     publishCommand(id, 'cmd/config/set', command.payload);

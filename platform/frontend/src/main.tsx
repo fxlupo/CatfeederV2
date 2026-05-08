@@ -43,9 +43,18 @@ type Device = {
   status?: Record<string, any>;
   telemetry?: Record<string, any>;
   config?: Config;
+  configDesired?: Config;
+  configSync?: ConfigSync;
   feedLog?: Record<string, any>[];
   alerts?: Record<string, any>[];
   commands?: Record<string, any>[];
+};
+type ConfigSync = {
+  state?: 'unknown' | 'synced' | 'pending' | 'drift';
+  desiredUpdatedAt?: string;
+  reportedUpdatedAt?: string;
+  commandId?: string;
+  message?: string;
 };
 type Health = {
   platformVersion?: string;
@@ -76,7 +85,7 @@ function App() {
   const [feedGrams, setFeedGrams] = useState(5);
   const [feedServo, setFeedServo] = useState(0);
   const [notice, setNotice] = useState('');
-  const [platformVersion, setPlatformVersion] = useState('0.3.1');
+  const [platformVersion, setPlatformVersion] = useState('0.4.0');
 
   async function loadDevice(id = deviceId) {
     const data = await api.get<Device>(`/api/devices/${id}`);
@@ -87,7 +96,7 @@ function App() {
   useEffect(() => {
     loadDevice().catch(() => undefined);
     api.get<Health>('/api/health')
-      .then((health) => setPlatformVersion(health.platformVersion ?? '0.3.1'))
+      .then((health) => setPlatformVersion(health.platformVersion ?? '0.4.0'))
       .catch(() => undefined);
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => undefined);
@@ -180,6 +189,7 @@ function App() {
             <Metric label="Heap" value={`${device.status?.heap ?? '-'} B`} />
             <Metric label="IP" value={device.status?.ip ?? '-'} />
             <Metric label="Status" value={<span className={`badge ${online ? 'ok' : 'warn'}`}>{online ? 'online' : 'offline'}</span>} />
+            <Metric label="Config" value={<ConfigSyncBadge sync={device.configSync} />} />
           </Panel>
 
           <Panel title="Telemetrie" icon={<Gauge size={18} />}>
@@ -235,6 +245,7 @@ function App() {
 
       {tab === 'schedule' && (
         <Panel title="Fütterungszeiten" icon={<CalendarClock size={18} />} wide>
+          <ConfigSyncNote sync={device.configSync} />
           <div className="table">
             {(configDraft.slots ?? []).map((slot, index) => (
               <div className="slot-row" key={index}>
@@ -253,6 +264,7 @@ function App() {
 
       {tab === 'calibration' && (
         <Panel title="Kalibrierung" icon={<Settings size={18} />} wide>
+          <ConfigSyncNote sync={device.configSync} />
           <div className="settings-grid">
             <NumberField label="Default Gramm" value={configDraft.defaultGrams} onChange={(v) => setConfigDraft({ ...configDraft, defaultGrams: v })} />
             <NumberField label="Steps pro Gramm" value={configDraft.stepsPerGram} onChange={(v) => setConfigDraft({ ...configDraft, stepsPerGram: v })} />
@@ -295,6 +307,39 @@ function commandStateClass(state?: string) {
   if (state === 'done' || state === 'accepted') return 'ok';
   if (state === 'timeout' || state === 'aborted' || state === 'rejected') return 'bad';
   return 'warn';
+}
+
+function configSyncClass(state?: string) {
+  if (state === 'synced') return 'ok';
+  if (state === 'drift') return 'bad';
+  return 'warn';
+}
+
+function configSyncLabel(state?: string) {
+  if (state === 'synced') return 'sync';
+  if (state === 'pending') return 'pending';
+  if (state === 'drift') return 'drift';
+  return 'unknown';
+}
+
+function ConfigSyncBadge({ sync }: { sync?: ConfigSync }) {
+  return <span className={`badge ${configSyncClass(sync?.state)}`}>{configSyncLabel(sync?.state)}</span>;
+}
+
+function ConfigSyncNote({ sync }: { sync?: ConfigSync }) {
+  return (
+    <div className={`sync-note ${configSyncClass(sync?.state)}`}>
+      <ConfigSyncBadge sync={sync} />
+      <span>{configSyncText(sync)}</span>
+    </div>
+  );
+}
+
+function configSyncText(sync?: ConfigSync) {
+  if (sync?.state === 'synced') return `Reported passt zur Desired Config · ${formatDate(sync.reportedUpdatedAt)}`;
+  if (sync?.state === 'pending') return `Warte auf Report vom ESP · ${formatDate(sync.desiredUpdatedAt)}`;
+  if (sync?.state === 'drift') return `Desired und Reported unterscheiden sich · ${formatDate(sync.reportedUpdatedAt)}`;
+  return 'Noch kein Config-Sync-Status vorhanden';
 }
 
 function formatAge(seconds?: number | null) {

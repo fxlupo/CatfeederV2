@@ -184,6 +184,34 @@ button:disabled {
   margin-top: 10px;
 }
 
+.sync-note {
+  align-items: center;
+  border: 1px solid #edf0f3;
+  border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+}
+
+.sync-note span:last-child {
+  color: #596675;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.sync-note.ok {
+  background: #f4fbf8;
+}
+
+.sync-note.warn {
+  background: #fffaf0;
+}
+
+.sync-note.bad {
+  background: #fff5f6;
+}
+
 .notice {
   background: #dff3eb;
   border: 1px solid #9ccdb9;

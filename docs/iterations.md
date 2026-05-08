@@ -1,5 +1,29 @@
 # Iterationen
 
+## 2026-05-08 - Iteration 3 Config-Sync Basis (Platform 0.4.0)
+
+Scope:
+
+- Plattform-Version auf `0.4.0` gesetzt.
+- Backend speichert `config_desired` getrennt von `config_reported`.
+- Datenbank-Migration ergaenzt:
+  - `devices.config_desired`
+  - `devices.config_desired_at`
+  - `devices.config_reported_at`
+- Backend berechnet pro Device `configSync`:
+  - `synced`
+  - `pending`
+  - `drift`
+  - `unknown`
+- Firmware-Version `fw` wird beim Config-Vergleich ignoriert, weil sie kein
+  konfigurierbarer Zielwert ist.
+- React UI zeigt Config-Sync im Dashboard, Zeitplan und Kalibrierung.
+- Service-Worker-Cache auf `catfeeder-ui-0.4.0` gesetzt.
+
+Verifikation:
+
+- Backend- und Frontend-Build lokal pruefen.
+
 ## 2026-05-08 - Iteration 3 Mobile-Menü korrigiert (Platform 0.3.1)
 
 Scope:

@@ -560,6 +560,11 @@ Aktueller Implementierungsstand:
 - Plattform-Version `0.3.1`:
   - Breakpoint fuer Desktop-Navigation auf `980px` angehoben, damit iPhones
     nicht mehr die zu breite Top-Navigation bekommen.
+- Plattform-Version `0.4.0`:
+  - Backend speichert Desired Config separat von Reported Config.
+  - Backend berechnet `configSync` als `synced`, `pending`, `drift` oder
+    `unknown`.
+  - UI zeigt Config-Sync-Status in Dashboard, Zeitplan und Kalibrierung.
 
 Umfang:
 
@@ -627,7 +632,7 @@ Akzeptanz:
 
 Naechster Block in Iteration 3:
 
-1. PWA auf Android/iOS im echten Browser pruefen.
-2. Desired/Reported Config-Sync modellieren.
+1. Config-Sync auf dem NAS mit echter Slot-Aenderung testen.
+2. Command- und Audit-Log weiter haerten.
 3. Alert- und Push-Strategie fuer Android/iOS festlegen.
-4. Command- und Audit-Log weiter haerten.
+4. PWA auf Android/iOS weiter verfeinern.

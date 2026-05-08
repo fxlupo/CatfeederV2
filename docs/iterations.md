@@ -68,6 +68,12 @@ Verifikation:
   - Haengende Commands wechseln nach Timeout auf `timeout`.
   - Device-Ansicht hydriert Commands aus Postgres nach Backend-Neustart.
   - React UI zeigt Command-Status und Alerts mit klaren Status-Badges.
+- Bedien-Haertung erweitert:
+  - Feed- und Config-Kommandos werden bei Offline-Device im Backend abgelehnt.
+  - React UI sperrt Feed-Start und Config-Speichern, wenn das Device offline
+    ist.
+  - Command-Anzeige trennt aktive Commands von juengerer Historie.
+  - Terminale Commands und Alerts koennen per API/UI bereinigt werden.
 
 ## 2026-05-08 - MQTT-Grundlage auf ESP umgesetzt (1.3.0)
 

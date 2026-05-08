@@ -524,6 +524,10 @@ Aktueller Implementierungsstand:
   - Offline-Alerts werden erzeugt.
   - Command-Timeouts werden sichtbar.
   - UI zeigt Command-Status und Alerts klarer.
+- Bedien-Haertung:
+  - Offline-Devices bekommen keine Feed-/Config-Kommandos.
+  - UI deaktiviert kritische Aktionen offline.
+  - Erledigte Commands und Alerts koennen bereinigt werden.
 
 ### Iteration 3 - Config, Logs und Remote-Betrieb haerten
 

@@ -81,7 +81,8 @@ select {
 }
 
 .tabs button,
-.primary {
+.primary,
+.secondary {
   align-items: center;
   border: 1px solid #c7d0da;
   border-radius: 6px;
@@ -102,6 +103,21 @@ select {
   background: #236c5c;
   border-color: #236c5c;
   color: #ffffff;
+}
+
+.secondary {
+  background: #ffffff;
+  color: #384656;
+  margin-top: 12px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.action-note {
+  margin-top: 10px;
 }
 
 .notice {
@@ -216,6 +232,10 @@ small {
   gap: 8px;
   grid-template-columns: 86px 1fr 100px;
   padding: 10px 0;
+}
+
+.command.quiet {
+  opacity: 0.72;
 }
 
 .badge {

@@ -98,15 +98,43 @@ function App() {
     if (!device.seenAt) return false;
     return Date.now() - new Date(device.seenAt).getTime() < 30000;
   }, [device.online, device.seenAt]);
+  const activeCommands = useMemo(
+    () => (device.commands ?? []).filter((command) => ['queued', 'accepted'].includes(command.state)),
+    [device.commands],
+  );
+  const recentCommands = useMemo(
+    () => (device.commands ?? []).filter((command) => !['queued', 'accepted'].includes(command.state)).slice(-5).reverse(),
+    [device.commands],
+  );
 
   async function feedNow() {
+    if (!online) {
+      setNotice('Device offline');
+      return;
+    }
     await api.send(`/api/devices/${deviceId}/feed`, 'POST', { grams: feedGrams, servo: feedServo });
     setNotice('Fütterung gesendet');
   }
 
   async function saveConfig() {
+    if (!online) {
+      setNotice('Device offline');
+      return;
+    }
     await api.send(`/api/devices/${deviceId}/config`, 'PUT', configDraft);
     setNotice('Konfiguration gesendet');
+  }
+
+  async function clearTerminalCommands() {
+    const data = await api.send<Device>(`/api/devices/${deviceId}/commands/terminal`, 'DELETE');
+    setDevice(data);
+    setNotice('Command-Historie bereinigt');
+  }
+
+  async function clearAlerts() {
+    const data = await api.send<Device>(`/api/devices/${deviceId}/alerts`, 'DELETE');
+    setDevice(data);
+    setNotice('Alerts bereinigt');
   }
 
   return (
@@ -153,7 +181,8 @@ function App() {
               <label>Gramm<input type="number" value={feedGrams} min={1} max={500} onChange={(e) => setFeedGrams(Number(e.target.value))} /></label>
               <label>Servo<select value={feedServo} onChange={(e) => setFeedServo(Number(e.target.value))}><option value={0}>Beide</option><option value={1}>Servo 1</option><option value={2}>Servo 2</option></select></label>
             </div>
-            <button className="primary" onClick={feedNow}><Play size={18} />Start</button>
+            <button className="primary" onClick={feedNow} disabled={!online}><Play size={18} />Start</button>
+            {!online && <p className="muted action-note">Device offline</p>}
           </Panel>
 
           <Panel title="Alerts" icon={<AlertTriangle size={18} />}>
@@ -165,17 +194,28 @@ function App() {
               </div>
             ))}
             {(device.alerts ?? []).length === 0 && <p className="muted">Keine Alerts</p>}
+            {(device.alerts ?? []).length > 0 && <button className="secondary" onClick={clearAlerts}>Alerts leeren</button>}
           </Panel>
 
           <Panel title="Commands" icon={<Activity size={18} />}>
-            {(device.commands ?? []).slice(-5).reverse().map((command, index) => (
+            {activeCommands.map((command, index) => (
               <div className={`command ${command.state ?? 'queued'}`} key={index}>
                 <span className={`badge ${commandStateClass(command.state)}`}>{command.state ?? '-'}</span>
                 <strong>{command.type ?? '-'}</strong>
                 <small>{formatDate(command.updatedAt)}</small>
               </div>
             ))}
+            {recentCommands.map((command, index) => (
+              <div className={`command quiet ${command.state ?? 'done'}`} key={`recent-${index}`}>
+                <span className={`badge ${commandStateClass(command.state)}`}>{command.state ?? '-'}</span>
+                <strong>{command.type ?? '-'}</strong>
+                <small>{formatDate(command.updatedAt)}</small>
+              </div>
+            ))}
             {(device.commands ?? []).length === 0 && <p className="muted">Keine Commands</p>}
+            {(device.commands ?? []).some((command) => commandStateClass(command.state) !== 'warn') && (
+              <button className="secondary" onClick={clearTerminalCommands}>Erledigte leeren</button>
+            )}
           </Panel>
         </section>
       )}
@@ -193,7 +233,8 @@ function App() {
               </div>
             ))}
           </div>
-          <button className="primary" onClick={saveConfig}><Save size={18} />Speichern</button>
+          <button className="primary" onClick={saveConfig} disabled={!online}><Save size={18} />Speichern</button>
+          {!online && <p className="muted action-note">Speichern ist offline gesperrt</p>}
         </Panel>
       )}
 
@@ -210,7 +251,8 @@ function App() {
             <NumberField label="S2 Open" value={configDraft.s2Open} onChange={(v) => setConfigDraft({ ...configDraft, s2Open: v })} />
             <NumberField label="S2 Close" value={configDraft.s2Close} onChange={(v) => setConfigDraft({ ...configDraft, s2Close: v })} />
           </div>
-          <button className="primary" onClick={saveConfig}><Save size={18} />Speichern</button>
+          <button className="primary" onClick={saveConfig} disabled={!online}><Save size={18} />Speichern</button>
+          {!online && <p className="muted action-note">Speichern ist offline gesperrt</p>}
         </Panel>
       )}
 

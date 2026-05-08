@@ -46,6 +46,7 @@ type DeviceState = {
 const devices = new Map<string, DeviceState>();
 const sseClients = new Set<NodeJS.WritableStream>();
 const offlineAlerted = new Set<string>();
+const terminalCommandStates = new Set(['done', 'timeout', 'aborted', 'rejected']);
 const pool = new Pool({
   host: dbHost,
   port: dbPort,
@@ -209,6 +210,24 @@ async function checkCommandTimeouts() {
   }
 }
 
+async function clearTerminalCommands(deviceId: string) {
+  const device = getDevice(deviceId);
+  device.commands = device.commands.filter((command) => !terminalCommandStates.has(command.state));
+  await pool.query(
+    "delete from command_log where device_id = $1 and state in ('done', 'timeout', 'aborted', 'rejected')",
+    [deviceId],
+  );
+  sendEvent('command', { deviceId, cleared: true });
+}
+
+async function clearAlerts(deviceId: string) {
+  const device = getDevice(deviceId);
+  device.alerts = [];
+  offlineAlerted.delete(deviceId);
+  await pool.query('delete from alerts where device_id = $1', [deviceId]);
+  sendEvent('alert', { deviceId, cleared: true });
+}
+
 function rememberCommand(command: CommandState) {
   const device = getDevice(command.deviceId);
   const existing = device.commands.findIndex((item) => item.id === command.id);
@@ -220,6 +239,24 @@ function rememberCommand(command: CommandState) {
 function publishCommand(deviceId: string, suffix: string, payload: JsonMap) {
   const topic = `catfeeder/${deviceId}/${suffix}`;
   mqttClient.publish(topic, JSON.stringify(payload), { qos: 1 });
+}
+
+async function rejectCommand(deviceId: string, type: 'feed' | 'config', message: string) {
+  const command: CommandState = {
+    id: randomUUID(),
+    deviceId,
+    type,
+    state: 'rejected',
+    ok: false,
+    message,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+    payload: {},
+  };
+  rememberCommand(command);
+  await logCommand(command);
+  sendEvent('command', command);
+  return command;
 }
 
 async function hydrateDevice(deviceId: string) {
@@ -420,6 +457,10 @@ async function main() {
 
   app.post('/api/devices/:id/feed', async (request) => {
     const { id } = request.params as { id: string };
+    const device = await hydrateDevice(id);
+    if (!isOnline(device)) {
+      return rejectCommand(id, 'feed', 'device-offline');
+    }
     const body = (request.body ?? {}) as { grams?: number; servo?: number };
     const command: CommandState = {
       id: randomUUID(),
@@ -453,6 +494,10 @@ async function main() {
 
   app.put('/api/devices/:id/config', async (request) => {
     const { id } = request.params as { id: string };
+    const device = await hydrateDevice(id);
+    if (!isOnline(device)) {
+      return rejectCommand(id, 'config', 'device-offline');
+    }
     const config = (request.body ?? {}) as JsonMap;
     const command: CommandState = {
       id: randomUUID(),
@@ -469,6 +514,18 @@ async function main() {
     publishCommand(id, 'cmd/config/set', command.payload);
     sendEvent('command', command);
     return command;
+  });
+
+  app.delete('/api/devices/:id/commands/terminal', async (request) => {
+    const { id } = request.params as { id: string };
+    await clearTerminalCommands(id);
+    return serializeDevice(await hydrateDevice(id));
+  });
+
+  app.delete('/api/devices/:id/alerts', async (request) => {
+    const { id } = request.params as { id: string };
+    await clearAlerts(id);
+    return serializeDevice(await hydrateDevice(id));
   });
 
   await app.listen({ host: '0.0.0.0', port });

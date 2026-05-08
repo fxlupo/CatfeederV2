@@ -46,6 +46,8 @@ Verifikation:
   - Mosquitto, Postgres, Backend und Frontend laufen als Docker-Container.
   - Postgres-Volume wurde fuer den ersten Test per `docker compose down -v`
     neu initialisiert, damit `.env` Passwort und DB-User zusammenpassen.
+- Backend setzt `seenAt` nur noch bei echten MQTT-Nachrichten vom ESP, nicht
+  beim Lesen der Device-API oder beim Queuen von UI-Kommandos.
 
 ## 2026-05-08 - MQTT-Grundlage auf ESP umgesetzt (1.3.0)
 

@@ -62,6 +62,11 @@ function getDevice(deviceId: string) {
     device = { id: deviceId, feedLog: [], alerts: [], commands: [] };
     devices.set(deviceId, device);
   }
+  return device;
+}
+
+function markDeviceSeen(deviceId: string) {
+  const device = getDevice(deviceId);
   device.seenAt = nowIso();
   return device;
 }
@@ -148,7 +153,7 @@ async function logCommand(command: CommandState) {
 
 async function createAlert(deviceId: string, level: string, type: string, message: string, payload: JsonMap) {
   const alert = { id: randomUUID(), deviceId, level, type, message, createdAt: nowIso(), payload };
-  const device = getDevice(deviceId);
+  const device = markDeviceSeen(deviceId);
   device.alerts.push(alert);
   trim(device.alerts, 50);
   await pool.query(

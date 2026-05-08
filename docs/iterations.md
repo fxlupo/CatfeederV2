@@ -33,6 +33,8 @@ Scope:
 - Backend nutzt fuer Postgres einzelne Umgebungsvariablen statt
   `DATABASE_URL`, damit Passwoerter mit Sonderzeichen nicht URL-encodiert
   werden muessen.
+- Backend-Default fuer `POSTGRES_HOST` ist `db`, passend zum Compose-Service,
+  damit der Container nicht versehentlich auf `localhost` verbindet.
 
 Verifikation:
 

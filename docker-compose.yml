@@ -61,6 +61,10 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-catfeeder}
       POSTGRES_USER: ${POSTGRES_USER:-catfeeder}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-catfeeder-db-change-me}
+      NTFY_URL: ${NTFY_URL:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_CONTACT: ${VAPID_CONTACT:-}
     ports:
       - "${BACKEND_PORT:-3000}:3000"
 

@@ -55,6 +55,12 @@ Verifikation:
   - ESP fuehrt 5 g / beide Servos aus.
   - Command geht auf `done`.
   - `feed/log` wird persistent im Backend sichtbar.
+- Zeitplan-Aenderung aus der React-UI getestet:
+  - Backend sendet `cmd/config/set`.
+  - ESP speichert den geaenderten Slot persistent im NVS.
+  - `/api/config` auf dem ESP zeigt dieselbe Slot-Konfiguration wie das
+    Backend.
+  - Der geaenderte Scheduler-Slot hat automatisch eine Fuetterung ausgeloest.
 
 ## 2026-05-08 - MQTT-Grundlage auf ESP umgesetzt (1.3.0)
 

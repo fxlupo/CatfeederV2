@@ -514,6 +514,11 @@ Aktueller Implementierungsstand:
   - ESP fuehrt mechanisch aus
   - `cmd/result` meldet `done`
   - Feed-Event erscheint in der Historie.
+- Zeitplan-Aenderung aus der React-UI wurde erfolgreich getestet:
+  - Command `cmd/config/set`
+  - ESP speichert persistent
+  - Backend und ESP-REST zeigen dieselbe Slot-Konfiguration
+  - Scheduler hat den geaenderten Slot automatisch ausgefuehrt.
 
 ### Iteration 3 - Config, Logs und Remote-Betrieb haerten
 

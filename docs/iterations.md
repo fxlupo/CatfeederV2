@@ -25,6 +25,8 @@ Scope:
   - Alerts
 - Traefik-Override mit Labels nach bestehendem `proxy`-Netz-Muster angelegt.
 - `platform/README.md` mit Start- und Betriebsnotizen angelegt.
+- Mosquitto-Image auf `eclipse-mosquitto:2` gesetzt, da `2.1` kein gueltiger
+  Docker-Hub-Tag ist.
 
 Verifikation:
 

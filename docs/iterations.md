@@ -48,6 +48,13 @@ Verifikation:
     neu initialisiert, damit `.env` Passwort und DB-User zusammenpassen.
 - Backend setzt `seenAt` nur noch bei echten MQTT-Nachrichten vom ESP, nicht
   beim Lesen der Device-API oder beim Queuen von UI-Kommandos.
+- Remote-Plattform empfängt `config/reported`, `status` und `telemetry` vom
+  ESP.
+- Sofort-Fütterung aus der React-UI getestet:
+  - Backend sendet `cmd/feed`.
+  - ESP fuehrt 5 g / beide Servos aus.
+  - Command geht auf `done`.
+  - `feed/log` wird persistent im Backend sichtbar.
 
 ## 2026-05-08 - MQTT-Grundlage auf ESP umgesetzt (1.3.0)
 

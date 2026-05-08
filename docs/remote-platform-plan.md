@@ -505,6 +505,15 @@ Aktueller Implementierungsstand:
   - Mosquitto, Postgres, Backend und Frontend laufen als Docker-Container.
   - Fuer den ersten Test wurde das Postgres-Volume neu initialisiert, damit die
     `.env` Zugangsdaten sicher zum Datenbank-User passen.
+- Live-Daten laufen vom ESP ueber Mosquitto ins Backend:
+  - `config/reported`
+  - `status`
+  - `telemetry`
+- Sofort-Fütterung aus der React-UI wurde erfolgreich getestet:
+  - Command `cmd/feed`
+  - ESP fuehrt mechanisch aus
+  - `cmd/result` meldet `done`
+  - Feed-Event erscheint in der Historie.
 
 ### Iteration 3 - Config, Logs und Remote-Betrieb haerten
 

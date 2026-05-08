@@ -7,7 +7,7 @@ Scheduler, Sensor-Monitoring und Blockade-Benachrichtigung.
 
 - Zielplattform: ESP32
 - Buildsystem: PlatformIO / Arduino Framework
-- Firmware-Version: `1.3.0`
+- Firmware-Version: `1.4.0`
 - Web UI: lokal ueber HTTP, im Setup-Fall als Access Point
 - OTA: ArduinoOTA ueber WLAN/mDNS vorbereitet
 - Scheduler: taegliche Fuetterungszeiten, Anzahl per Firmware-Konstante
@@ -16,7 +16,8 @@ Scheduler, Sensor-Monitoring und Blockade-Benachrichtigung.
 - Blockadeerkennung: AS5600-Rotation plus INA219-Strom, mit Rueckwaertsfahrt
   und Wiederholversuchen
 - Benachrichtigung: WhatsApp via CallMeBot bei abgebrochener Fuetterung
-- Remote-Plattform: MQTT-Grundlage fuer externes Backend in Arbeit
+- Remote-Plattform: Docker-Stack mit Mosquitto, Backend, Postgres und React UI
+  in Iteration 2
 
 ## Projektstruktur
 
@@ -28,6 +29,10 @@ catfeeder/
 │   ├── architecture.md
 │   ├── iterations.md
 │   └── remote-platform-plan.md
+├── platform/
+│   ├── backend/         # MQTT-Bridge, REST, SSE, Persistenz
+│   ├── frontend/        # React UI, Nginx
+│   └── mosquitto/       # Broker-Konfiguration
 ├── src/
 │   ├── main.cpp          # App-Orchestrierung, OTA, Scheduler, Monitoring
 │   ├── pins.h            # GPIO-Definitionen
@@ -36,6 +41,8 @@ catfeeder/
 │   ├── motors.h/.cpp     # Stepper + Servos + Fuetterungsablauf
 │   ├── web.h/.cpp        # WLAN, Webserver, REST-API, SSE
 │   └── web_html.cpp      # Eingebettetes Webinterface
+├── docker-compose.yml
+├── docker-compose.traefik.yml
 └── tools/
     └── stepper_as5600_calibration.cpp
 ```
@@ -45,6 +52,29 @@ Firmware aus `src/` baut.
 
 Der Remote-Plattform-Plan fuer MQTT, Backend, React UI und Push-Service wird in
 `docs/remote-platform-plan.md` als lebendes Arbeitsdokument gepflegt.
+
+## Remote-Plattform
+
+Iteration 2 liegt unter `platform/` und wird per Docker Compose gestartet:
+
+```sh
+cp .env.example .env
+docker compose up --build
+```
+
+UI:
+
+```text
+http://localhost:8080
+```
+
+Mit Traefik:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml up --build -d
+```
+
+Details stehen in `platform/README.md`.
 
 ## Build
 

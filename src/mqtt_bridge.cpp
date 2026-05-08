@@ -3,9 +3,10 @@
 // =============================================================================
 #include "mqtt_bridge.h"
 
-void MqttBridge::begin(Config &c, Status &st) {
+void MqttBridge::begin(Config &c, Status &st, CfgManager &cm) {
     _cfg = &c;
     _st = &st;
+    _cm = &cm;
     _refreshBaseTopic();
     _client.setBufferSize(1536);
     _client.setCallback([this](char *topic, uint8_t *payload, unsigned int length) {
@@ -105,17 +106,19 @@ void MqttBridge::_subscribe() {
     char t[120];
     if (_topic(t, sizeof(t), "cmd/feed")) _client.subscribe(t);
     if (_topic(t, sizeof(t), "cmd/config/get")) _client.subscribe(t);
+    if (_topic(t, sizeof(t), "cmd/config/set")) _client.subscribe(t);
 }
 
 void MqttBridge::_callback(char *topic, uint8_t *payload, unsigned int length) {
-    char msg[512];
+    char msg[1536];
     size_t n = length < sizeof(msg) - 1 ? length : sizeof(msg) - 1;
     memcpy(msg, payload, n);
     msg[n] = '\0';
 
-    char feedTopic[120], cfgGetTopic[120];
+    char feedTopic[120], cfgGetTopic[120], cfgSetTopic[120];
     _topic(feedTopic, sizeof(feedTopic), "cmd/feed");
     _topic(cfgGetTopic, sizeof(cfgGetTopic), "cmd/config/get");
+    _topic(cfgSetTopic, sizeof(cfgSetTopic), "cmd/config/set");
 
     JsonDocument doc;
     DeserializationError err = deserializeJson(doc, msg);
@@ -143,7 +146,58 @@ void MqttBridge::_callback(char *topic, uint8_t *payload, unsigned int length) {
     if (strcmp(topic, cfgGetTopic) == 0) {
         publishCommandResult(id, true, "accepted");
         publishConfigReported();
+        return;
     }
+
+    if (strcmp(topic, cfgSetTopic) == 0) {
+        if (err) {
+            publishCommandResult("", false, "rejected", "invalid-json");
+            return;
+        }
+        JsonObject src = doc["config"].is<JsonObject>() ? doc["config"].as<JsonObject>() : doc.as<JsonObject>();
+        if (!_applyConfigSet(src)) {
+            publishCommandResult(id, false, "rejected", "invalid-config");
+            return;
+        }
+        if (_cm) _cm->save(*_cfg);
+        publishCommandResult(id, true, "accepted");
+        publishConfigReported();
+        publishCommandResult(id, true, "done");
+    }
+}
+
+bool MqttBridge::_applyConfigSet(JsonObject src) {
+    if (!_cfg) return false;
+
+    if (!src["slots"].isNull()) {
+        JsonArray slots = src["slots"];
+        if (slots.size() > MAX_SLOTS) return false;
+        for (int i = 0; i < min((int)slots.size(), MAX_SLOTS); i++) {
+            _cfg->slots[i].active = slots[i]["on"] | false;
+            _cfg->slots[i].hour   = constrain((uint8_t)(slots[i]["h"] | 0), 0, 23);
+            _cfg->slots[i].minute = constrain((uint8_t)(slots[i]["m"] | 0), 0, 59);
+            _cfg->slots[i].grams  = constrain((uint16_t)(slots[i]["g"] | DEFAULT_FEED_GRAMS), 1, 500);
+            _cfg->slots[i].servo  = constrain((uint8_t)(slots[i]["sv"] | 0), 0, 2);
+            _cfg->slots[i].doneToday = false;
+        }
+    }
+
+    if (!src["defaultGrams"].isNull()) _cfg->defaultGrams = constrain((uint16_t)src["defaultGrams"], 1, 500);
+    if (!src["stepsPerGram"].isNull()) _cfg->stepsPerGram = constrain((uint16_t)src["stepsPerGram"], 1, 5000);
+    if (!src["stepperSpeed"].isNull()) _cfg->stepperSpeed = constrain((uint16_t)src["stepperSpeed"], 100, 10000);
+    if (!src["stepperPulseUS"].isNull()) _cfg->stepperPulseUS = constrain((uint16_t)src["stepperPulseUS"], 2, 50);
+    if (!src["stepperDirSetupUS"].isNull()) _cfg->stepperDirSetupUS = constrain((uint16_t)src["stepperDirSetupUS"], 0, 2000);
+    if (!src["stepperHoldMS"].isNull()) _cfg->stepperHoldMS = constrain((uint16_t)src["stepperHoldMS"], 0, 5000);
+    if (!src["stepperBlockMA"].isNull()) _cfg->stepperBlockMA = constrain((uint16_t)src["stepperBlockMA"], 100, 5000);
+    if (!src["blockRetries"].isNull()) _cfg->blockRetries = constrain((uint8_t)src["blockRetries"], 0, 10);
+    if (!src["blockReverseSteps"].isNull()) _cfg->blockReverseSteps = constrain((uint16_t)src["blockReverseSteps"], 50, 5000);
+    if (!src["blockMinRotPct"].isNull()) _cfg->blockMinRotPct = constrain((uint8_t)src["blockMinRotPct"], 5, 90);
+    if (!src["servoSpeedDPS"].isNull()) _cfg->servoSpeedDPS = constrain((uint16_t)src["servoSpeedDPS"], 20, 3000);
+    if (!src["s1Open"].isNull()) _cfg->s1Open = constrain((uint8_t)src["s1Open"], 0, 180);
+    if (!src["s1Close"].isNull()) _cfg->s1Close = constrain((uint8_t)src["s1Close"], 0, 180);
+    if (!src["s2Open"].isNull()) _cfg->s2Open = constrain((uint8_t)src["s2Open"], 0, 180);
+    if (!src["s2Close"].isNull()) _cfg->s2Close = constrain((uint8_t)src["s2Close"], 0, 180);
+    return true;
 }
 
 void MqttBridge::publishStatus() {

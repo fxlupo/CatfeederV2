@@ -6,8 +6,8 @@
 #include <Preferences.h>
 
 // ─── Firmware ───────────────────────────────────────────────────────────────
-#define FW_VERSION             "1.3.0"
-#define CONFIG_SCHEMA_VERSION  9
+#define FW_VERSION             "1.4.0"
+#define CONFIG_SCHEMA_VERSION  10
 
 // ─── WLAN ───────────────────────────────────────────────────────────────────
 #define WIFI_AP_SSID           "CatFeeder-Setup"

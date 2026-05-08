@@ -327,7 +327,7 @@ void setup() {
     refreshStatus();
 
     web.begin(cfg, statusData, sensors, motors, cfgMgr, feedLog);
-    mqtt.begin(cfg, statusData);
+    mqtt.begin(cfg, statusData, cfgMgr);
     syncNTP();
     beginOTA();
 

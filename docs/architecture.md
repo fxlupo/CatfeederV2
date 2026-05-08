@@ -17,7 +17,7 @@
 - `web.*`: WLAN/AP-Fallback, mDNS, REST-API und SSE-Liveupdates.
 - `web_html.cpp`: Eingebettete lokale Weboberflaeche.
 - `mqtt_bridge.*`: Ausgehende MQTT-Anbindung fuer Remote-Plattform, Status,
-  Telemetrie, Feed-Events und erste Remote-Kommandos.
+  Telemetrie, Feed-Events, Feed-Kommandos und Remote-Konfiguration.
 - `tools/stepper_as5600_calibration.cpp`: Separates Kalibrier-/Testprogramm,
   wird von PlatformIO nicht als Firmware gebaut.
 
@@ -117,12 +117,30 @@ Basis-Topics:
 - `catfeeder/{deviceId}/feed/log`
 - `catfeeder/{deviceId}/cmd/feed`
 - `catfeeder/{deviceId}/cmd/config/get`
+- `catfeeder/{deviceId}/cmd/config/set`
 - `catfeeder/{deviceId}/cmd/ack`
 - `catfeeder/{deviceId}/cmd/result`
 
 Iteration 1 nutzt `PubSubClient` ohne TLS. TLS ist in der Config vorbereitet,
-aber noch nicht aktiv. Der Scheduler bleibt lokal auf dem ESP; MQTT-Kommandos
-koennen eine manuelle Fütterung ausloesen und bekommen Ack/Result.
+aber noch nicht aktiv. Der Scheduler bleibt lokal auf dem ESP.
+
+MQTT-Kommandos koennen eine manuelle Fütterung ausloesen und bekommen
+Ack/Result. `cmd/config/set` nimmt die Reported-Config-Struktur der
+Remote-Plattform an und speichert geaenderte Fuetterungszeiten und
+Kalibrierwerte persistent im NVS.
+
+## Remote-Plattform
+
+Iteration 2 fuehrt unter `platform/` einen Docker-Stack ein:
+
+- Mosquitto mit Usern und ACLs
+- Postgres fuer persistente Telemetrie, Feed-Events, Commands und Alerts
+- Node.js/TypeScript Backend als MQTT-Bridge, REST API und SSE-Quelle
+- React UI hinter Nginx
+- optionaler Traefik-Override fuer das externe `proxy`-Netz
+
+Das Frontend spricht nur mit dem Backend. MQTT-Credentials bleiben serverseitig
+im Docker-Stack. Der ESP wird weiterhin nicht direkt aus dem Internet exposed.
 
 ## Fütterungsablauf
 

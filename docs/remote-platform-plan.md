@@ -1,6 +1,6 @@
 # Remote-Plattform-Plan
 
-Status: Iteration 1 umgesetzt und gegen lokalen Mosquitto getestet
+Status: Iteration 2 in Umsetzung
 Ziel: Dieser Plan wird waehrend der Umsetzung laufend aktualisiert und bleibt
 der fuehrende Implementierungsplan fuer Remote-Zugriff, externe UI und Backend.
 
@@ -443,6 +443,8 @@ Akzeptanz:
 
 ### Iteration 2 - Docker-Plattform
 
+Status: Grundgeruest angelegt, Docker-Laufzeittest offen
+
 Ziel:
 
 - Vollstaendiger lokaler/remote-faehiger Docker-Stack.
@@ -482,6 +484,23 @@ Akzeptanz:
 - UI kann manuelle Fütterung ausloesen.
 - Feed-Events erscheinen persistent in der Historie.
 - Blockade-Abbruch erzeugt Alert.
+
+Aktueller Implementierungsstand:
+
+- `docker-compose.yml` fuer Mosquitto, Postgres, Backend und Frontend.
+- `docker-compose.traefik.yml` mit optionalen Traefik-Labels fuer das externe
+  `proxy`-Netz.
+- Mosquitto erzeugt Passwort-Datei und ACLs beim Containerstart aus `.env`.
+- Backend:
+  - MQTT Subscribe auf Status, Telemetrie, Config, Feed-Events und Command
+    Ack/Result.
+  - REST API fuer Devices, Feed, Config, Historie und Telemetrie.
+  - SSE fuer Live-Updates zur UI.
+  - Postgres-Persistenz fuer Telemetrie, Feed-Events, Commands und Alerts.
+- React UI:
+  - Dashboard, Sofort-Fuetterung, Zeitplan, Kalibrierung, Historie, Alerts.
+- Firmware `1.4.0` unterstuetzt `cmd/config/set` fuer Remote-Konfiguration.
+- Docker/Compose-Laufzeittest ist noch offen.
 
 ### Iteration 3 - Config, Logs und Remote-Betrieb haerten
 

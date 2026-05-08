@@ -1,0 +1,72 @@
+services:
+  mqtt:
+    image: eclipse-mosquitto:2.1
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    environment:
+      MQTT_DEVICE_USER: ${MQTT_DEVICE_USER:-catfeeder}
+      MQTT_DEVICE_PASS: ${MQTT_DEVICE_PASS:-catfeeder-device-change-me}
+      MQTT_DEVICE_ID: ${MQTT_DEVICE_ID:-catfeeder}
+      MQTT_BACKEND_USER: ${MQTT_BACKEND_USER:-backend}
+      MQTT_BACKEND_PASS: ${MQTT_BACKEND_PASS:-catfeeder-backend-change-me}
+    volumes:
+      - ./platform/mosquitto/config:/mosquitto/config:ro
+      - mqtt-data:/mosquitto/data
+      - mqtt-log:/mosquitto/log
+    command:
+      - /bin/sh
+      - -c
+      - |
+        mosquitto_passwd -b -c /tmp/mosquitto_passwords "$$MQTT_DEVICE_USER" "$$MQTT_DEVICE_PASS"
+        mosquitto_passwd -b /tmp/mosquitto_passwords "$$MQTT_BACKEND_USER" "$$MQTT_BACKEND_PASS"
+        printf "user %s\ntopic readwrite catfeeder/%s/#\n\nuser %s\ntopic readwrite catfeeder/#\n" "$$MQTT_DEVICE_USER" "$$MQTT_DEVICE_ID" "$$MQTT_BACKEND_USER" > /tmp/mosquitto_acl
+        exec mosquitto -c /mosquitto/config/mosquitto.conf
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-catfeeder}
+      POSTGRES_USER: ${POSTGRES_USER:-catfeeder}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-catfeeder-db-change-me}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+
+  backend:
+    build:
+      context: ./platform/backend
+    restart: unless-stopped
+    depends_on:
+      mqtt:
+        condition: service_started
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      MQTT_URL: mqtt://mqtt:1883
+      MQTT_USERNAME: ${MQTT_BACKEND_USER:-backend}
+      MQTT_PASSWORD: ${MQTT_BACKEND_PASS:-catfeeder-backend-change-me}
+      DATABASE_URL: postgres://${POSTGRES_USER:-catfeeder}:${POSTGRES_PASSWORD:-catfeeder-db-change-me}@db:5432/${POSTGRES_DB:-catfeeder}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+
+  frontend:
+    build:
+      context: ./platform/frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+
+volumes:
+  mqtt-data:
+  mqtt-log:
+  postgres-data:

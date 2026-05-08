@@ -1,5 +1,37 @@
 # Iterationen
 
+## 2026-05-08 - Docker-Plattform fuer Iteration 2 begonnen (1.4.0)
+
+Scope:
+
+- Firmware-Version auf `1.4.0` gesetzt.
+- MQTT-Firmware um `cmd/config/set` erweitert, damit Backend/UI
+  Fuetterungszeiten und Kalibrierwerte persistent an den ESP senden koennen.
+- Docker Compose fuer Mosquitto, Postgres, Backend und Frontend angelegt.
+- Mosquitto startet mit Usern, Passwort-Datei und dynamisch erzeugten ACLs.
+- Backend als Node.js/TypeScript-Service angelegt:
+  - MQTT Bridge fuer `catfeeder/#`
+  - REST API
+  - SSE Live-Stream
+  - Device Registry im Speicher
+  - Persistenz fuer Telemetrie, Feed-Events, Commands und Alerts in Postgres
+  - Feed- und Config-Kommandos Richtung ESP
+- React UI angelegt:
+  - Dashboard
+  - Sofort-Fuetterung
+  - Zeitplanverwaltung
+  - Kalibrierung
+  - Historie
+  - Alerts
+- Traefik-Override mit Labels nach bestehendem `proxy`-Netz-Muster angelegt.
+- `platform/README.md` mit Start- und Betriebsnotizen angelegt.
+
+Verifikation:
+
+- `pio run -e esp32dev` erfolgreich.
+- Docker/Compose konnte in dieser Shell nicht ausgefuehrt werden
+  (`docker: command not found`).
+
 ## 2026-05-08 - MQTT-Grundlage auf ESP umgesetzt (1.3.0)
 
 Scope:

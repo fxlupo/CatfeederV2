@@ -1,0 +1,404 @@
+import cors from '@fastify/cors';
+import Fastify from 'fastify';
+import mqtt, { MqttClient } from 'mqtt';
+import pg from 'pg';
+import { randomUUID } from 'node:crypto';
+
+const { Pool } = pg;
+
+const port = Number(process.env.PORT ?? 3000);
+const mqttUrl = process.env.MQTT_URL ?? 'mqtt://localhost:1883';
+const mqttUsername = process.env.MQTT_USERNAME ?? 'backend';
+const mqttPassword = process.env.MQTT_PASSWORD ?? '';
+const databaseUrl = process.env.DATABASE_URL ?? 'postgres://catfeeder:catfeeder@localhost:5432/catfeeder';
+
+type JsonMap = Record<string, unknown>;
+
+type CommandState = {
+  id: string;
+  deviceId: string;
+  type: 'feed' | 'config';
+  state: string;
+  ok?: boolean;
+  message?: string;
+  createdAt: string;
+  updatedAt: string;
+  payload: JsonMap;
+};
+
+type DeviceState = {
+  id: string;
+  seenAt?: string;
+  status?: JsonMap;
+  telemetry?: JsonMap;
+  config?: JsonMap;
+  feedLog: JsonMap[];
+  alerts: JsonMap[];
+  commands: CommandState[];
+};
+
+const devices = new Map<string, DeviceState>();
+const sseClients = new Set<NodeJS.WritableStream>();
+const pool = new Pool({ connectionString: databaseUrl });
+let mqttClient: MqttClient;
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function getDevice(deviceId: string) {
+  let device = devices.get(deviceId);
+  if (!device) {
+    device = { id: deviceId, feedLog: [], alerts: [], commands: [] };
+    devices.set(deviceId, device);
+  }
+  device.seenAt = nowIso();
+  return device;
+}
+
+function sendEvent(event: string, data: unknown) {
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of sseClients) client.write(payload);
+}
+
+function trim<T>(items: T[], limit: number) {
+  if (items.length > limit) items.splice(0, items.length - limit);
+}
+
+async function initDb() {
+  await pool.query(`
+    create table if not exists devices (
+      id text primary key,
+      last_seen timestamptz,
+      status jsonb,
+      telemetry jsonb,
+      config_reported jsonb
+    );
+
+    create table if not exists telemetry (
+      id bigserial primary key,
+      device_id text not null,
+      created_at timestamptz not null default now(),
+      payload jsonb not null
+    );
+
+    create table if not exists feed_events (
+      id bigserial primary key,
+      device_id text not null,
+      created_at timestamptz not null default now(),
+      payload jsonb not null
+    );
+
+    create table if not exists command_log (
+      id text primary key,
+      device_id text not null,
+      type text not null,
+      state text not null,
+      ok boolean,
+      message text,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      payload jsonb not null
+    );
+
+    create table if not exists alerts (
+      id bigserial primary key,
+      device_id text not null,
+      created_at timestamptz not null default now(),
+      level text not null,
+      type text not null,
+      message text not null,
+      payload jsonb not null
+    );
+  `);
+}
+
+async function upsertDevice(deviceId: string, field: 'status' | 'telemetry' | 'config_reported', payload: JsonMap) {
+  await pool.query(
+    `insert into devices (id, last_seen, ${field})
+     values ($1, now(), $2)
+     on conflict (id) do update set last_seen = now(), ${field} = excluded.${field}`,
+    [deviceId, payload],
+  );
+}
+
+async function logCommand(command: CommandState) {
+  await pool.query(
+    `insert into command_log (id, device_id, type, state, ok, message, payload)
+     values ($1, $2, $3, $4, $5, $6, $7)
+     on conflict (id) do update set
+       state = excluded.state,
+       ok = excluded.ok,
+       message = excluded.message,
+       updated_at = now(),
+       payload = excluded.payload`,
+    [command.id, command.deviceId, command.type, command.state, command.ok ?? null, command.message ?? '', command.payload],
+  );
+}
+
+async function createAlert(deviceId: string, level: string, type: string, message: string, payload: JsonMap) {
+  const alert = { id: randomUUID(), deviceId, level, type, message, createdAt: nowIso(), payload };
+  const device = getDevice(deviceId);
+  device.alerts.push(alert);
+  trim(device.alerts, 50);
+  await pool.query(
+    'insert into alerts (device_id, level, type, message, payload) values ($1, $2, $3, $4, $5)',
+    [deviceId, level, type, message, payload],
+  );
+  sendEvent('alert', alert);
+}
+
+function rememberCommand(command: CommandState) {
+  const device = getDevice(command.deviceId);
+  const existing = device.commands.findIndex((item) => item.id === command.id);
+  if (existing >= 0) device.commands[existing] = command;
+  else device.commands.push(command);
+  trim(device.commands, 50);
+}
+
+function publishCommand(deviceId: string, suffix: string, payload: JsonMap) {
+  const topic = `catfeeder/${deviceId}/${suffix}`;
+  mqttClient.publish(topic, JSON.stringify(payload), { qos: 1 });
+}
+
+async function hydrateDevice(deviceId: string) {
+  const device = getDevice(deviceId);
+  const stored = await pool.query(
+    'select last_seen as "lastSeen", status, telemetry, config_reported as "configReported" from devices where id = $1',
+    [deviceId],
+  );
+  if (stored.rows[0]) {
+    device.seenAt = stored.rows[0].lastSeen?.toISOString?.() ?? device.seenAt;
+    device.status ??= stored.rows[0].status ?? undefined;
+    device.telemetry ??= stored.rows[0].telemetry ?? undefined;
+    device.config ??= stored.rows[0].configReported ?? undefined;
+  }
+
+  if (device.feedLog.length === 0) {
+    const rows = await pool.query(
+      'select created_at as "createdAt", payload from feed_events where device_id = $1 order by id desc limit 100',
+      [deviceId],
+    );
+    device.feedLog = rows.rows.map((row) => ({ ...row.payload, receivedAt: row.createdAt }));
+  }
+
+  if (device.alerts.length === 0) {
+    const rows = await pool.query(
+      'select created_at as "createdAt", level, type, message, payload from alerts where device_id = $1 order by id desc limit 50',
+      [deviceId],
+    );
+    device.alerts = rows.rows.map((row) => ({ ...row.payload, level: row.level, type: row.type, message: row.message, createdAt: row.createdAt }));
+  }
+
+  return device;
+}
+
+async function handleMqttMessage(topic: string, raw: Buffer) {
+  const parts = topic.split('/');
+  if (parts.length < 3 || parts[0] !== 'catfeeder') return;
+  const deviceId = parts[1];
+  const channel = parts.slice(2).join('/');
+  let payload: JsonMap;
+
+  try {
+    payload = JSON.parse(raw.toString('utf8')) as JsonMap;
+  } catch {
+    return;
+  }
+
+  const device = getDevice(deviceId);
+
+  if (channel === 'status') {
+    device.status = payload;
+    await upsertDevice(deviceId, 'status', payload);
+    sendEvent('device', { deviceId, status: payload, seenAt: device.seenAt });
+    return;
+  }
+
+  if (channel === 'telemetry') {
+    device.telemetry = payload;
+    await upsertDevice(deviceId, 'telemetry', payload);
+    await pool.query('insert into telemetry (device_id, payload) values ($1, $2)', [deviceId, payload]);
+    sendEvent('telemetry', { deviceId, telemetry: payload });
+    if (payload.fillLow === true) await createAlert(deviceId, 'warning', 'fill_low', 'Fuellstand niedrig', payload);
+    if (payload.overcurrent === true) await createAlert(deviceId, 'critical', 'overcurrent', 'Ueberstrom erkannt', payload);
+    return;
+  }
+
+  if (channel === 'config/reported') {
+    device.config = payload;
+    await upsertDevice(deviceId, 'config_reported', payload);
+    sendEvent('config', { deviceId, config: payload });
+    return;
+  }
+
+  if (channel === 'feed/log' || channel === 'event') {
+    if (channel === 'feed/log') {
+      device.feedLog.push({ ...payload, receivedAt: nowIso() });
+      trim(device.feedLog, 100);
+      await pool.query('insert into feed_events (device_id, payload) values ($1, $2)', [deviceId, payload]);
+    }
+    sendEvent('feed', { deviceId, event: payload });
+    if (payload.aborted === true || payload.type === 'feed_aborted') {
+      await createAlert(deviceId, 'critical', 'feed_aborted', 'Fuetterung abgebrochen', payload);
+    }
+    return;
+  }
+
+  if (channel === 'cmd/ack' || channel === 'cmd/result') {
+    const id = String(payload.id ?? '');
+    if (!id) return;
+    const prior = device.commands.find((item) => item.id === id);
+    const command: CommandState = {
+      id,
+      deviceId,
+      type: prior?.type ?? 'feed',
+      state: String(payload.state ?? (channel === 'cmd/ack' ? 'accepted' : 'done')),
+      ok: Boolean(payload.ok),
+      message: String(payload.message ?? ''),
+      createdAt: prior?.createdAt ?? nowIso(),
+      updatedAt: nowIso(),
+      payload: prior?.payload ?? payload,
+    };
+    rememberCommand(command);
+    await logCommand(command);
+    sendEvent('command', command);
+  }
+}
+
+async function startMqtt() {
+  mqttClient = mqtt.connect(mqttUrl, {
+    username: mqttUsername,
+    password: mqttPassword,
+    reconnectPeriod: 3000,
+    keepalive: 30,
+  });
+
+  mqttClient.on('connect', () => {
+    console.log(`[mqtt] connected ${mqttUrl}`);
+    mqttClient.subscribe('catfeeder/+/status');
+    mqttClient.subscribe('catfeeder/+/telemetry');
+    mqttClient.subscribe('catfeeder/+/config/reported');
+    mqttClient.subscribe('catfeeder/+/feed/log');
+    mqttClient.subscribe('catfeeder/+/event');
+    mqttClient.subscribe('catfeeder/+/cmd/ack');
+    mqttClient.subscribe('catfeeder/+/cmd/result');
+  });
+
+  mqttClient.on('message', (topic, payload) => {
+    handleMqttMessage(topic, payload).catch((err) => console.error('[mqtt] message failed', err));
+  });
+
+  mqttClient.on('error', (err) => console.error('[mqtt]', err.message));
+}
+
+async function main() {
+  await initDb();
+  await startMqtt();
+
+  const app = Fastify({ logger: true });
+  await app.register(cors, { origin: true });
+
+  app.get('/api/health', async () => ({
+    ok: true,
+    mqttConnected: mqttClient.connected,
+    devices: devices.size,
+  }));
+
+  app.get('/api/events', async (_request, reply) => {
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    });
+    reply.raw.write('\n');
+    sseClients.add(reply.raw);
+    reply.raw.on('close', () => sseClients.delete(reply.raw));
+  });
+
+  app.get('/api/devices', async () => Array.from(devices.values()));
+
+  app.get('/api/devices/:id', async (request) => {
+    const { id } = request.params as { id: string };
+    return hydrateDevice(id);
+  });
+
+  app.get('/api/devices/:id/telemetry', async (request) => {
+    const { id } = request.params as { id: string };
+    const rows = await pool.query(
+      'select created_at as "createdAt", payload from telemetry where device_id = $1 order by id desc limit 200',
+      [id],
+    );
+    return rows.rows;
+  });
+
+  app.get('/api/devices/:id/feed-log', async (request) => {
+    const { id } = request.params as { id: string };
+    const rows = await pool.query(
+      'select created_at as "createdAt", payload from feed_events where device_id = $1 order by id desc limit 100',
+      [id],
+    );
+    return rows.rows;
+  });
+
+  app.post('/api/devices/:id/feed', async (request) => {
+    const { id } = request.params as { id: string };
+    const body = (request.body ?? {}) as { grams?: number; servo?: number };
+    const command: CommandState = {
+      id: randomUUID(),
+      deviceId: id,
+      type: 'feed',
+      state: 'queued',
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+      payload: {
+        id: randomUUID(),
+        type: 'feed',
+        grams: Math.max(1, Math.min(500, Number(body.grams ?? 20))),
+        servo: Math.max(0, Math.min(2, Number(body.servo ?? 0))),
+        source: 'remote-ui',
+        issuedAt: nowIso(),
+      },
+    };
+    command.payload.id = command.id;
+    rememberCommand(command);
+    await logCommand(command);
+    publishCommand(id, 'cmd/feed', command.payload);
+    sendEvent('command', command);
+    return command;
+  });
+
+  app.get('/api/devices/:id/config', async (request) => {
+    const { id } = request.params as { id: string };
+    publishCommand(id, 'cmd/config/get', { id: randomUUID(), type: 'config_get', issuedAt: nowIso() });
+    return getDevice(id).config ?? {};
+  });
+
+  app.put('/api/devices/:id/config', async (request) => {
+    const { id } = request.params as { id: string };
+    const config = (request.body ?? {}) as JsonMap;
+    const command: CommandState = {
+      id: randomUUID(),
+      deviceId: id,
+      type: 'config',
+      state: 'queued',
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+      payload: { id: '', type: 'config_set', config, source: 'remote-ui', issuedAt: nowIso() },
+    };
+    command.payload.id = command.id;
+    rememberCommand(command);
+    await logCommand(command);
+    publishCommand(id, 'cmd/config/set', command.payload);
+    sendEvent('command', command);
+    return command;
+  });
+
+  await app.listen({ host: '0.0.0.0', port });
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

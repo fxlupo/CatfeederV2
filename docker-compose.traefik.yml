@@ -1,0 +1,19 @@
+services:
+  frontend:
+    networks:
+      - default
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.catfeeder.rule=Host(`${PUBLIC_HOST}`)
+      - traefik.http.routers.catfeeder.entrypoints=https
+      - traefik.http.routers.catfeeder.tls=true
+      - traefik.http.routers.catfeeder.tls.certresolver=${TRAEFIK_CERTRESOLVER:-http}
+      - traefik.http.routers.catfeeder.priority=10
+      - traefik.http.routers.catfeeder.middlewares=secHeaders@file
+      - traefik.http.services.catfeeder.loadbalancer.server.port=80
+
+networks:
+  proxy:
+    external: true

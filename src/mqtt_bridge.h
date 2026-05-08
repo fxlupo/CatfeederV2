@@ -10,7 +10,7 @@
 
 class MqttBridge {
 public:
-    void begin(Config &c, Status &st);
+    void begin(Config &c, Status &st, CfgManager &cm);
     void loop();
     void publishStatus();
     void publishTelemetry();
@@ -26,6 +26,7 @@ private:
     PubSubClient _client{_wifi};
     Config      *_cfg = nullptr;
     Status      *_st  = nullptr;
+    CfgManager  *_cm  = nullptr;
 
     uint32_t _lastConnectAttempt = 0;
     uint32_t _lastStatus = 0;
@@ -41,6 +42,7 @@ private:
     void _connect();
     void _subscribe();
     void _callback(char *topic, uint8_t *payload, unsigned int length);
+    bool _applyConfigSet(JsonObject src);
     bool _topic(char *out, size_t outLen, const char *suffix) const;
     void _publishJson(const char *suffix, JsonDocument &doc, bool retained = false);
     void _setState(const char *state, bool connected);

@@ -557,6 +557,9 @@ Aktueller Implementierungsstand:
   - Safe-Area fuer iOS
   - einspaltige Panels als Standard
   - Tablet/Desktop erweitert das Layout progressiv
+- Plattform-Version `0.3.1`:
+  - Breakpoint fuer Desktop-Navigation auf `980px` angehoben, damit iPhones
+    nicht mehr die zu breite Top-Navigation bekommen.
 
 Umfang:
 

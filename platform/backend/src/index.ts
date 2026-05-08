@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 
 const { Pool } = pg;
 
-const platformVersion = '0.3.0';
+const platformVersion = '0.3.1';
 const port = Number(process.env.PORT ?? 3000);
 const mqttUrl = process.env.MQTT_URL ?? 'mqtt://localhost:1883';
 const mqttUsername = process.env.MQTT_USERNAME ?? 'backend';

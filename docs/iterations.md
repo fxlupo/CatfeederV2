@@ -1,5 +1,20 @@
 # Iterationen
 
+## 2026-05-08 - Iteration 3 Mobile-Menü korrigiert (Platform 0.3.1)
+
+Scope:
+
+- Plattform-Version auf `0.3.1` gesetzt.
+- Mobile/Desktop-Breakpoint von `720px` auf `980px` angehoben, damit iPhone
+  und grosse Handy-Viewports konsequent die Bottom-Navigation verwenden.
+- Dashboard-Grid-Breakpoint auf `1180px` angehoben, damit das breite
+  Vier-Spalten-Layout erst auf echten Desktop-Breiten greift.
+- Service-Worker-Cache auf `catfeeder-ui-0.3.1` gesetzt.
+
+Verifikation:
+
+- Code-Check lokal, Docker-Build muss auf dem NAS erfolgen.
+
 ## 2026-05-08 - Iteration 3 gestartet: Mobile-first PWA-Basis (Platform 0.3.0)
 
 Scope:

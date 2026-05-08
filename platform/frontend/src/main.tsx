@@ -76,7 +76,7 @@ function App() {
   const [feedGrams, setFeedGrams] = useState(5);
   const [feedServo, setFeedServo] = useState(0);
   const [notice, setNotice] = useState('');
-  const [platformVersion, setPlatformVersion] = useState('0.3.0');
+  const [platformVersion, setPlatformVersion] = useState('0.3.1');
 
   async function loadDevice(id = deviceId) {
     const data = await api.get<Device>(`/api/devices/${id}`);
@@ -87,7 +87,7 @@ function App() {
   useEffect(() => {
     loadDevice().catch(() => undefined);
     api.get<Health>('/api/health')
-      .then((health) => setPlatformVersion(health.platformVersion ?? '0.3.0'))
+      .then((health) => setPlatformVersion(health.platformVersion ?? '0.3.1'))
       .catch(() => undefined);
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => undefined);

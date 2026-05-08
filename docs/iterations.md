@@ -1,5 +1,32 @@
 # Iterationen
 
+## 2026-05-08 - Iteration 3 gestartet: Mobile-first PWA-Basis (Platform 0.3.0)
+
+Scope:
+
+- Plattform-Version auf `0.3.0` gesetzt.
+- Backend `/api/health` meldet `platformVersion` jetzt als `0.3.0`.
+- React UI nutzt `0.3.0` als sichtbare Plattform-Version im Header.
+- PWA-Metadaten ergaenzt:
+  - `manifest.webmanifest`
+  - Theme-Color
+  - iOS/Android WebApp-Meta-Tags
+  - App-Icon
+  - Service Worker mit kleinem App-Shell-Cache
+- Frontend-Dockerfile kopiert `public/`, damit Manifest, Icon und Service
+  Worker im Nginx-Image landen.
+- UI auf Mobile-first umgestellt:
+  - Bottom-Navigation fuer Handy-Bedienung
+  - groessere Touch-Ziele
+  - iOS Safe-Area-Unterstuetzung
+  - sticky Statuskopf
+  - einspaltige mobile Panels
+  - Desktop-Layout bleibt ab Tablet/Breitbild erhalten
+
+Verifikation:
+
+- Code-Check lokal, Docker-Build muss auf dem NAS erfolgen.
+
 ## 2026-05-08 - Iteration 2 abgeschlossen: Docker-Plattform Baseline (1.4.0 / Platform 0.2.0)
 
 Scope:

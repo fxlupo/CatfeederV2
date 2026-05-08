@@ -76,7 +76,7 @@ function App() {
   const [feedGrams, setFeedGrams] = useState(5);
   const [feedServo, setFeedServo] = useState(0);
   const [notice, setNotice] = useState('');
-  const [platformVersion, setPlatformVersion] = useState('0.2.0');
+  const [platformVersion, setPlatformVersion] = useState('0.3.0');
 
   async function loadDevice(id = deviceId) {
     const data = await api.get<Device>(`/api/devices/${id}`);
@@ -87,8 +87,11 @@ function App() {
   useEffect(() => {
     loadDevice().catch(() => undefined);
     api.get<Health>('/api/health')
-      .then((health) => setPlatformVersion(health.platformVersion ?? '0.2.0'))
+      .then((health) => setPlatformVersion(health.platformVersion ?? '0.3.0'))
       .catch(() => undefined);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+    }
     const source = new EventSource('/api/events');
     const refresh = () => loadDevice().catch(() => undefined);
     source.addEventListener('device', refresh);
@@ -147,9 +150,12 @@ function App() {
   return (
     <main>
       <header className="topbar">
-        <div>
+        <div className="title-block">
           <h1>CatFeeder</h1>
-          <p>{online ? 'Online' : 'Offline'} · Firmware {device.status?.fw ?? device.config?.fw ?? 'unbekannt'} · Plattform {platformVersion} · zuletzt {formatAge(device.ageSeconds)}</p>
+          <p>
+            <span className={`status-dot ${online ? 'online' : 'offline'}`} />
+            {online ? 'Online' : 'Offline'} · Firmware {device.status?.fw ?? device.config?.fw ?? 'unbekannt'} · Plattform {platformVersion} · zuletzt {formatAge(device.ageSeconds)}
+          </p>
         </div>
         <label className="device-picker">
           <span>Device</span>

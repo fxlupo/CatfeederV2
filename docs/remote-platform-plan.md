@@ -1,6 +1,6 @@
 # Remote-Plattform-Plan
 
-Status: Iteration 2 abgeschlossen, Iteration 3 startet
+Status: Iteration 3 gestartet
 Ziel: Dieser Plan wird waehrend der Umsetzung laufend aktualisiert und bleibt
 der fuehrende Implementierungsplan fuer Remote-Zugriff, externe UI und Backend.
 
@@ -534,7 +534,7 @@ Aktueller Implementierungsstand:
 
 ### Iteration 3 - Config, Logs und Remote-Betrieb haerten
 
-Status: geplant / startet nach Iteration-2-Abschluss
+Status: gestartet am 2026-05-08
 
 Ziel:
 
@@ -542,6 +542,21 @@ Ziel:
 - UI wird Mobile-first als WebApp/PWA fuer Android und iOS weiterentwickelt,
   weil der CatFeeder hauptsaechlich am Handy bedient wird.
 - Push-Benachrichtigungen werden als Mobile-WebApp-Thema mitgedacht.
+
+Aktueller Implementierungsstand:
+
+- Plattform-Version `0.3.0`.
+- PWA-Grundlage:
+  - Web-App-Manifest
+  - Android/iOS Meta-Tags
+  - App-Icon
+  - Service Worker mit kleinem App-Shell-Cache
+- Mobile-first UI-Basis:
+  - Bottom-Navigation auf kleinen Viewports
+  - groessere Touch-Flaechen
+  - Safe-Area fuer iOS
+  - einspaltige Panels als Standard
+  - Tablet/Desktop erweitert das Layout progressiv
 
 Umfang:
 
@@ -607,9 +622,9 @@ Akzeptanz:
 
 ## Aktueller naechster Schritt
 
-Start Iteration 3:
+Naechster Block in Iteration 3:
 
-1. Mobile-first UI/PWA-Grundlage definieren.
+1. PWA auf Android/iOS im echten Browser pruefen.
 2. Desired/Reported Config-Sync modellieren.
 3. Alert- und Push-Strategie fuer Android/iOS festlegen.
 4. Command- und Audit-Log weiter haerten.

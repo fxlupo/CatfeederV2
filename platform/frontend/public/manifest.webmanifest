@@ -1,0 +1,19 @@
+{
+  "name": "CatFeeder",
+  "short_name": "CatFeeder",
+  "description": "Remote Dashboard fuer den CatFeeder",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#edf0f3",
+  "theme_color": "#236c5c",
+  "icons": [
+    {
+      "src": "/icons/catfeeder-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

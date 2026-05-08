@@ -56,6 +56,14 @@ type ConfigSync = {
   commandId?: string;
   message?: string;
 };
+type AuditEntry = {
+  id: number;
+  createdAt: string;
+  actor: 'device' | 'remote-ui' | 'system';
+  category: string;
+  action: string;
+  payload: Record<string, unknown>;
+};
 type Health = {
   platformVersion?: string;
 };
@@ -88,6 +96,7 @@ function App() {
   const [platformVersion, setPlatformVersion] = useState('0.4.1');
   const [configDirty, setConfigDirty] = useState(false);
   const configDirtyRef = useRef(false);
+  const [audit, setAudit] = useState<AuditEntry[]>([]);
 
   async function loadDevice(id = deviceId) {
     const data = await api.get<Device>(`/api/devices/${id}`);
@@ -123,6 +132,10 @@ function App() {
     source.addEventListener('command', refresh);
     return () => source.close();
   }, [deviceId]);
+
+  useEffect(() => {
+    if (tab === 'history') loadAudit().catch(() => undefined);
+  }, [tab, deviceId]);
 
   const online = useMemo(() => {
     if (typeof device.online === 'boolean') return device.online;
@@ -174,6 +187,13 @@ function App() {
     const data = await api.send<Device>(`/api/devices/${deviceId}/commands/terminal`, 'DELETE');
     setDevice(data);
     setNotice('Command-Historie bereinigt');
+  }
+
+  async function loadAudit(id = deviceId) {
+    try {
+      const data = await api.get<AuditEntry[]>(`/api/devices/${id}/audit?limit=100`);
+      setAudit(data);
+    } catch { /* ignore */ }
   }
 
   async function clearAlerts() {
@@ -312,16 +332,38 @@ function App() {
       )}
 
       {tab === 'history' && (
-        <Panel title="Historie" icon={<History size={18} />} wide>
-          {(device.feedLog ?? []).slice().reverse().map((event, index) => (
-            <div className={`event ${event.aborted ? 'danger' : ''}`} key={index}>
-              <strong>{event.type ?? 'feed'}</strong>
-              <span>{event.grams ?? '-'} g · Servo {event.servo ?? '-'}</span>
-              <small>{event.ts ?? event.receivedAt ?? ''}</small>
-            </div>
-          ))}
-          {(device.feedLog ?? []).length === 0 && <p className="muted">Noch keine Feed-Events</p>}
-        </Panel>
+        <>
+          <Panel title="Feed-Events" icon={<History size={18} />} wide>
+            {(device.feedLog ?? []).slice().reverse().map((event, index) => (
+              <div className={`event ${event.aborted ? 'danger' : ''}`} key={index}>
+                <strong>{event.type ?? 'feed'}</strong>
+                <span>{event.grams ?? '-'} g · Servo {event.servo ?? '-'}</span>
+                {event.blockRetryCount ? <span className="badge warn">{event.blockRetryCount}× Blockade</span> : null}
+                <small>{String(event.ts ?? event.receivedAt ?? '')}</small>
+              </div>
+            ))}
+            {(device.feedLog ?? []).length === 0 && <p className="muted">Noch keine Feed-Events</p>}
+          </Panel>
+
+          <Panel title="Audit-Log" icon={<Activity size={18} />} wide>
+            <p className="muted" style={{ marginBottom: '8px', fontSize: '0.85em' }}>
+              Alle signifikanten Ereignisse — Feed-Kommandos, Config-Änderungen, Konnektivität.
+              Terminal Commands werden nicht aus der Datenbank gelöscht.
+            </p>
+            <button className="secondary" onClick={() => loadAudit()} style={{ marginBottom: '12px' }}>
+              Aktualisieren
+            </button>
+            {audit.map((entry) => (
+              <div className="audit-row" key={entry.id}>
+                <span className={`badge ${auditActorClass(entry.actor)}`}>{entry.actor}</span>
+                <span className={`badge ${auditCategoryClass(entry.category)}`}>{entry.category}</span>
+                <strong className="audit-action">{entry.action}</strong>
+                <small>{formatDate(entry.createdAt)}</small>
+              </div>
+            ))}
+            {audit.length === 0 && <p className="muted">Kein Audit-Eintrag vorhanden</p>}
+          </Panel>
+        </>
       )}
     </main>
   );
@@ -331,6 +373,19 @@ function App() {
     slots[index] = { ...slots[index], ...patch };
     updateConfigDraft({ ...configDraft, slots });
   }
+}
+
+function auditActorClass(actor: string) {
+  if (actor === 'device') return 'ok';
+  if (actor === 'remote-ui') return 'info';
+  return 'neutral';
+}
+
+function auditCategoryClass(category: string) {
+  if (category === 'feed') return 'ok';
+  if (category === 'alert') return 'bad';
+  if (category === 'connectivity') return 'warn';
+  return 'neutral';
 }
 
 function commandStateClass(state?: string) {

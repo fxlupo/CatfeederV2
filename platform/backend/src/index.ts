@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 
 const { Pool } = pg;
 
-const platformVersion = '0.4.1';
+const platformVersion = '0.5.0';
 const port = Number(process.env.PORT ?? 3000);
 const mqttUrl = process.env.MQTT_URL ?? 'mqtt://localhost:1883';
 const mqttUsername = process.env.MQTT_USERNAME ?? 'backend';
@@ -84,8 +84,16 @@ function getDevice(deviceId: string) {
 
 function markDeviceSeen(deviceId: string) {
   const device = getDevice(deviceId);
+  const wasOffline = device.seenAt
+    ? Date.now() - new Date(device.seenAt).getTime() > offlineAfterMs
+    : false;
   device.seenAt = nowIso();
-  offlineAlerted.delete(deviceId);
+  if (wasOffline || offlineAlerted.has(deviceId)) {
+    offlineAlerted.delete(deviceId);
+    auditLog(deviceId, 'device', 'connectivity', 'device.online', {
+      seenAt: device.seenAt,
+    }).catch(() => undefined);
+  }
   return device;
 }
 
@@ -172,6 +180,23 @@ function updateConfigSync(device: DeviceState) {
   };
 }
 
+// ── Audit-Log ────────────────────────────────────────────────────────────────
+
+async function auditLog(
+  deviceId: string,
+  actor: 'device' | 'remote-ui' | 'system',
+  category: 'feed' | 'config' | 'connectivity' | 'command' | 'alert',
+  action: string,
+  payload: JsonMap = {},
+) {
+  await pool.query(
+    'insert into audit_log (device_id, actor, category, action, payload) values ($1, $2, $3, $4, $5)',
+    [deviceId, actor, category, action, payload],
+  ).catch((err: Error) => console.error('[audit]', err.message));
+}
+
+// ── DB ───────────────────────────────────────────────────────────────────────
+
 async function initDb() {
   await pool.query(`
     create table if not exists devices (
@@ -220,11 +245,22 @@ async function initDb() {
       message text not null,
       payload jsonb not null
     );
+
+    create table if not exists audit_log (
+      id bigserial primary key,
+      device_id text not null,
+      created_at timestamptz not null default now(),
+      actor text not null,
+      category text not null,
+      action text not null,
+      payload jsonb not null default '{}'
+    );
   `);
 
   await pool.query('alter table devices add column if not exists config_desired jsonb');
   await pool.query('alter table devices add column if not exists config_desired_at timestamptz');
   await pool.query('alter table devices add column if not exists config_reported_at timestamptz');
+  await pool.query('create index if not exists audit_log_device_id_idx on audit_log(device_id, id desc)');
 }
 
 async function upsertDevice(deviceId: string, field: 'status' | 'telemetry' | 'config_reported', payload: JsonMap) {
@@ -271,6 +307,7 @@ async function createAlert(deviceId: string, level: string, type: string, messag
     'insert into alerts (device_id, level, type, message, payload) values ($1, $2, $3, $4, $5)',
     [deviceId, level, type, message, payload],
   );
+  await auditLog(deviceId, 'system', 'alert', `alert.${type}`, { level, message });
   sendEvent('alert', alert);
 }
 
@@ -278,9 +315,14 @@ async function checkOfflineDevices() {
   for (const device of devices.values()) {
     if (!device.seenAt || isOnline(device) || offlineAlerted.has(device.id)) continue;
     offlineAlerted.add(device.id);
+    const ageSeconds = Math.round((Date.now() - new Date(device.seenAt).getTime()) / 1000);
     await createAlert(device.id, 'warning', 'device_offline', 'Device offline', {
       seenAt: device.seenAt,
-      ageSeconds: Math.round((Date.now() - new Date(device.seenAt).getTime()) / 1000),
+      ageSeconds,
+    });
+    await auditLog(device.id, 'system', 'connectivity', 'device.offline', {
+      seenAt: device.seenAt,
+      ageSeconds,
     });
     sendEvent('device', serializeDevice(device));
   }
@@ -304,18 +346,23 @@ async function checkCommandTimeouts() {
         };
       }
       await logCommand(command);
+      await auditLog(device.id, 'system', 'command', `${command.type}.timeout`, {
+        commandId: command.id,
+      });
       sendEvent('command', command);
     }
   }
 }
 
+// Löscht terminal commands nur aus dem In-Memory-State.
+// Die DB-Records bleiben als permanente Audit-History erhalten.
 async function clearTerminalCommands(deviceId: string) {
   const device = getDevice(deviceId);
-  device.commands = device.commands.filter((command) => !terminalCommandStates.has(command.state));
-  await pool.query(
-    "delete from command_log where device_id = $1 and state in ('done', 'timeout', 'aborted', 'rejected')",
-    [deviceId],
-  );
+  const cleared = device.commands.filter((c) => terminalCommandStates.has(c.state)).length;
+  device.commands = device.commands.filter((c) => !terminalCommandStates.has(c.state));
+  if (cleared > 0) {
+    await auditLog(deviceId, 'remote-ui', 'command', 'commands.cleared', { count: cleared });
+  }
   sendEvent('command', { deviceId, cleared: true });
 }
 
@@ -354,6 +401,7 @@ async function rejectCommand(deviceId: string, type: 'feed' | 'config', message:
   };
   rememberCommand(command);
   await logCommand(command);
+  await auditLog(deviceId, 'system', 'command', `${type}.rejected`, { reason: message });
   sendEvent('command', command);
   return command;
 }
@@ -403,8 +451,12 @@ async function hydrateDevice(deviceId: string) {
   }
 
   if (device.commands.length === 0) {
+    // Lädt nur non-terminal aktive Commands + die letzten 20 terminal (für kurzfristige Anzeige)
     const rows = await pool.query(
-      'select id, device_id as "deviceId", type, state, ok, message, created_at as "createdAt", updated_at as "updatedAt", payload from command_log where device_id = $1 order by updated_at desc limit 50',
+      `select id, device_id as "deviceId", type, state, ok, message,
+              created_at as "createdAt", updated_at as "updatedAt", payload
+       from command_log where device_id = $1
+       order by updated_at desc limit 50`,
       [deviceId],
     );
     device.commands = rows.rows.reverse();
@@ -449,12 +501,23 @@ async function handleMqttMessage(topic: string, raw: Buffer) {
   if (channel === 'config/reported') {
     device.config = payload;
     await upsertDevice(deviceId, 'config_reported', payload);
+    const prevSync = device.configSync;
     device.configSync = {
       ...device.configSync,
       state: device.configSync?.state ?? 'unknown',
       reportedUpdatedAt: nowIso(),
     };
     updateConfigSync(device);
+    const syncState = device.configSync?.state;
+    await auditLog(deviceId, 'device', 'config', 'config.reported', {
+      syncState,
+      commandId: prevSync?.commandId,
+    });
+    if (syncState === 'synced' && prevSync?.state === 'pending') {
+      await auditLog(deviceId, 'device', 'config', 'config.confirmed', {
+        commandId: prevSync.commandId,
+      });
+    }
     sendEvent('config', serializeDevice(device));
     return;
   }
@@ -464,6 +527,12 @@ async function handleMqttMessage(topic: string, raw: Buffer) {
       device.feedLog.push({ ...payload, receivedAt: nowIso() });
       trim(device.feedLog, 100);
       await pool.query('insert into feed_events (device_id, payload) values ($1, $2)', [deviceId, payload]);
+      const action = payload.aborted === true ? 'feed.aborted' : 'feed.completed';
+      await auditLog(deviceId, 'device', 'feed', action, {
+        grams: payload.grams,
+        servo: payload.servo,
+        blockRetries: payload.blockRetryCount,
+      });
     }
     sendEvent('feed', serializeDevice(device));
     if (payload.aborted === true || payload.type === 'feed_aborted') {
@@ -494,6 +563,18 @@ async function handleMqttMessage(topic: string, raw: Buffer) {
         state: 'drift',
         message: command.message || 'config-command-failed',
       };
+      await auditLog(deviceId, 'device', 'config', 'config.failed', {
+        commandId: command.id,
+        message: command.message,
+      });
+    }
+    if (channel === 'cmd/result') {
+      const action = command.ok ? `${command.type}.done` : `${command.type}.failed`;
+      await auditLog(deviceId, 'device', 'command', action, {
+        commandId: command.id,
+        ok: command.ok,
+        message: command.message,
+      });
     }
     await logCommand(command);
     sendEvent('command', command);
@@ -584,6 +665,46 @@ async function main() {
     return rows.rows;
   });
 
+  // Paginierter Command-Verlauf aus der Datenbank (inkl. älterer terminal states)
+  app.get('/api/devices/:id/commands', async (request) => {
+    const { id } = request.params as { id: string };
+    const query = request.query as { limit?: string; offset?: string; state?: string };
+    const limit = Math.min(100, Number(query.limit ?? 50));
+    const offset = Number(query.offset ?? 0);
+    let sql = `select id, device_id as "deviceId", type, state, ok, message,
+                      created_at as "createdAt", updated_at as "updatedAt", payload
+               from command_log where device_id = $1`;
+    const params: (string | number)[] = [id];
+    if (query.state === 'active') {
+      sql += " and state in ('queued','accepted')";
+    } else if (query.state === 'terminal') {
+      sql += " and state in ('done','timeout','aborted','rejected')";
+    }
+    sql += ` order by updated_at desc limit $${params.length + 1} offset $${params.length + 2}`;
+    params.push(limit, offset);
+    const rows = await pool.query(sql, params);
+    return rows.rows;
+  });
+
+  // Paginierter Audit-Log
+  app.get('/api/devices/:id/audit', async (request) => {
+    const { id } = request.params as { id: string };
+    const query = request.query as { limit?: string; offset?: string; category?: string };
+    const limit = Math.min(200, Number(query.limit ?? 100));
+    const offset = Number(query.offset ?? 0);
+    let sql = `select id, created_at as "createdAt", actor, category, action, payload
+               from audit_log where device_id = $1`;
+    const params: (string | number)[] = [id];
+    if (query.category) {
+      params.push(query.category);
+      sql += ` and category = $${params.length}`;
+    }
+    sql += ` order by id desc limit $${params.length + 1} offset $${params.length + 2}`;
+    params.push(limit, offset);
+    const rows = await pool.query(sql, params);
+    return rows.rows;
+  });
+
   app.post('/api/devices/:id/feed', async (request) => {
     const { id } = request.params as { id: string };
     const device = await hydrateDevice(id);
@@ -591,6 +712,8 @@ async function main() {
       return rejectCommand(id, 'feed', 'device-offline');
     }
     const body = (request.body ?? {}) as { grams?: number; servo?: number };
+    const grams = Math.max(1, Math.min(500, Number(body.grams ?? 20)));
+    const servo = Math.max(0, Math.min(2, Number(body.servo ?? 0)));
     const command: CommandState = {
       id: randomUUID(),
       deviceId: id,
@@ -601,8 +724,8 @@ async function main() {
       payload: {
         id: randomUUID(),
         type: 'feed',
-        grams: Math.max(1, Math.min(500, Number(body.grams ?? 20))),
-        servo: Math.max(0, Math.min(2, Number(body.servo ?? 0))),
+        grams,
+        servo,
         source: 'remote-ui',
         issuedAt: nowIso(),
       },
@@ -610,6 +733,11 @@ async function main() {
     command.payload.id = command.id;
     rememberCommand(command);
     await logCommand(command);
+    await auditLog(id, 'remote-ui', 'feed', 'feed.issued', {
+      commandId: command.id,
+      grams,
+      servo,
+    });
     publishCommand(id, 'cmd/feed', command.payload);
     sendEvent('command', command);
     return command;
@@ -650,6 +778,7 @@ async function main() {
     updateConfigSync(device);
     rememberCommand(command);
     await logCommand(command);
+    await auditLog(id, 'remote-ui', 'config', 'config.sent', { commandId: command.id });
     publishCommand(id, 'cmd/config/set', command.payload);
     sendEvent('command', command);
     return command;

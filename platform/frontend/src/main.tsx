@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import {
   Activity,
   AlertTriangle,
+  Bell,
   CalendarClock,
   Gauge,
   History,
@@ -64,6 +65,13 @@ type AuditEntry = {
   action: string;
   payload: Record<string, unknown>;
 };
+type PushConfig = {
+  vapidPublicKey?: string | null;
+  webPushEnabled?: boolean;
+  ntfyEnabled?: boolean;
+  ntfyUrl?: string | null;
+  subscriptions?: number;
+};
 type Health = {
   platformVersion?: string;
 };
@@ -97,6 +105,8 @@ function App() {
   const [configDirty, setConfigDirty] = useState(false);
   const configDirtyRef = useRef(false);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
+  const [pushConfig, setPushConfig] = useState<PushConfig>({});
+  const [pushState, setPushState] = useState<'unknown' | 'subscribed' | 'denied' | 'unsupported'>('unknown');
 
   async function loadDevice(id = deviceId) {
     const data = await api.get<Device>(`/api/devices/${id}`);
@@ -135,6 +145,7 @@ function App() {
 
   useEffect(() => {
     if (tab === 'history') loadAudit().catch(() => undefined);
+    if (tab === 'notifications') loadPushConfig().catch(() => undefined);
   }, [tab, deviceId]);
 
   const online = useMemo(() => {
@@ -189,6 +200,53 @@ function App() {
     setNotice('Command-Historie bereinigt');
   }
 
+  async function loadPushConfig() {
+    try {
+      const data = await api.get<PushConfig>('/api/push/config');
+      setPushConfig(data);
+    } catch { /* ignore */ }
+    // Aktuellen Push-Status prüfen
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setPushState('unsupported');
+      return;
+    }
+    if (Notification.permission === 'denied') { setPushState('denied'); return; }
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      setPushState(sub ? 'subscribed' : 'unknown');
+    } catch { /* ignore */ }
+  }
+
+  async function subscribePush() {
+    if (!pushConfig.vapidPublicKey) { setNotice('VAPID nicht konfiguriert'); return; }
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { setPushState('denied'); setNotice('Berechtigung verweigert'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(pushConfig.vapidPublicKey),
+    });
+    await api.send('/api/push/subscribe', 'POST', sub.toJSON());
+    setPushState('subscribed');
+    setNotice('Browser-Push aktiviert ✓');
+  }
+
+  async function unsubscribePush() {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return;
+    await api.send('/api/push/subscribe', 'DELETE', { endpoint: sub.endpoint });
+    await sub.unsubscribe();
+    setPushState('unknown');
+    setNotice('Browser-Push deaktiviert');
+  }
+
+  async function sendPushTest() {
+    await api.send('/api/push/test', 'POST');
+    setNotice('Testbenachrichtigung gesendet');
+  }
+
   async function loadAudit(id = deviceId) {
     try {
       const data = await api.get<AuditEntry[]>(`/api/devices/${id}/audit?limit=100`);
@@ -223,6 +281,7 @@ function App() {
         <button className={tab === 'schedule' ? 'active' : ''} onClick={() => setTab('schedule')}><CalendarClock size={18} />Zeitplan</button>
         <button className={tab === 'calibration' ? 'active' : ''} onClick={() => setTab('calibration')}><Settings size={18} />Kalibrierung</button>
         <button className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}><History size={18} />Historie</button>
+        <button className={tab === 'notifications' ? 'active' : ''} onClick={() => setTab('notifications')}><Bell size={18} />Push</button>
       </nav>
 
       {notice && <div className="notice">{notice}</div>}
@@ -331,6 +390,72 @@ function App() {
         </Panel>
       )}
 
+      {tab === 'notifications' && (
+        <section>
+          {pushConfig.ntfyEnabled && (
+            <Panel title="ntfy.sh" icon={<Bell size={18} />} wide>
+              <p className="muted" style={{ marginBottom: '8px' }}>
+                ntfy.sh ist aktiv. Abonniere den Kanal in der ntfy-App oder im Browser.
+              </p>
+              <div className="metric">
+                <span>Kanal-URL</span>
+                <strong><a href={pushConfig.ntfyUrl ?? ''} target="_blank" rel="noreferrer">{pushConfig.ntfyUrl}</a></strong>
+              </div>
+              <button className="secondary" onClick={sendPushTest} style={{ marginTop: '8px' }}>Testbenachrichtigung senden</button>
+            </Panel>
+          )}
+
+          {pushConfig.webPushEnabled ? (
+            <Panel title="Browser-Push (Web Push)" icon={<Bell size={18} />} wide>
+              <p className="muted" style={{ marginBottom: '8px' }}>
+                Erhält Benachrichtigungen direkt im Browser — auch wenn der Tab im Hintergrund ist.
+              </p>
+              <div className="metric"><span>Status</span>
+                <strong>
+                  {pushState === 'subscribed' && <span className="badge ok">Aktiv</span>}
+                  {pushState === 'unknown' && <span className="badge warn">Nicht aktiviert</span>}
+                  {pushState === 'denied' && <span className="badge bad">Verweigert</span>}
+                  {pushState === 'unsupported' && <span className="badge neutral">Nicht unterstützt</span>}
+                </strong>
+              </div>
+              <div className="metric"><span>Aktive Subscriptions (Server)</span><strong>{pushConfig.subscriptions ?? 0}</strong></div>
+              <div style={{ marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {pushState !== 'subscribed' && pushState !== 'unsupported' && pushState !== 'denied' && (
+                  <button className="primary" onClick={subscribePush}>Browser aktivieren</button>
+                )}
+                {pushState === 'subscribed' && (
+                  <button className="secondary" onClick={unsubscribePush}>Deaktivieren</button>
+                )}
+                <button className="secondary" onClick={sendPushTest}>Testbenachrichtigung</button>
+              </div>
+              {pushState === 'denied' && (
+                <p className="muted" style={{ marginTop: '8px' }}>Berechtigung verweigert. Bitte in den Browser-Einstellungen zurücksetzen.</p>
+              )}
+            </Panel>
+          ) : (
+            <Panel title="Browser-Push (Web Push)" icon={<Bell size={18} />} wide>
+              <p className="muted">
+                Web Push nicht konfiguriert. VAPID-Schlüssel in der Backend-Umgebung setzen:
+              </p>
+              <pre style={{ background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '4px', fontSize: '0.8em', marginTop: '8px' }}>
+                {`npx web-push generate-vapid-keys\n# Ausgabe in .env eintragen:\nVAPID_PUBLIC_KEY=...\nVAPID_PRIVATE_KEY=...\nVAPID_CONTACT=mailto:admin@example.com`}
+              </pre>
+            </Panel>
+          )}
+
+          {!pushConfig.ntfyEnabled && !pushConfig.webPushEnabled && (
+            <Panel title="ntfy.sh" icon={<Bell size={18} />} wide>
+              <p className="muted">
+                ntfy.sh nicht konfiguriert. In .env setzen:
+              </p>
+              <pre style={{ background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '4px', fontSize: '0.8em', marginTop: '8px' }}>
+                {`NTFY_URL=https://ntfy.sh/dein-eindeutiger-kanal`}
+              </pre>
+            </Panel>
+          )}
+        </section>
+      )}
+
       {tab === 'history' && (
         <>
           <Panel title="Feed-Events" icon={<History size={18} />} wide>
@@ -373,6 +498,13 @@ function App() {
     slots[index] = { ...slots[index], ...patch };
     updateConfigDraft({ ...configDraft, slots });
   }
+}
+
+function urlBase64ToUint8Array(base64: string) {
+  const padding = '='.repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(b64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
 }
 
 function auditActorClass(actor: string) {

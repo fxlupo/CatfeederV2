@@ -1,4 +1,4 @@
-const CACHE_NAME = 'catfeeder-ui-0.4.1';
+const CACHE_NAME = 'catfeeder-ui-0.5.1';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/catfeeder-icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -14,6 +14,35 @@ self.addEventListener('activate', (event) => {
   );
   self.clients.claim();
 });
+
+// ── Push-Benachrichtigungen ──────────────────────────────────────────────────
+
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  let data;
+  try { data = event.data.json(); } catch { data = { title: 'CatFeeder', body: event.data.text() }; }
+  const options = {
+    body: data.body ?? '',
+    icon: '/icons/catfeeder-icon.svg',
+    badge: '/icons/catfeeder-icon.svg',
+    tag: 'catfeeder-alert',
+    renotify: true,
+    requireInteraction: data.priority === 'high' || data.priority === 'urgent',
+  };
+  event.waitUntil(self.registration.showNotification(data.title ?? 'CatFeeder', options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+      if (wins.length > 0) return wins[0].focus();
+      return clients.openWindow('/');
+    }),
+  );
+});
+
+// ── App-Shell-Cache ──────────────────────────────────────────────────────────
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;

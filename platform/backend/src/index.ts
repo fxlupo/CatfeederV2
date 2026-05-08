@@ -3,10 +3,12 @@ import Fastify from 'fastify';
 import mqtt, { MqttClient } from 'mqtt';
 import pg from 'pg';
 import { randomUUID } from 'node:crypto';
+import { PushService, type WebPushSubscription } from './push.js';
 
 const { Pool } = pg;
 
-const platformVersion = '0.5.0';
+const platformVersion = '0.5.1';
+const pushService = new PushService();
 const port = Number(process.env.PORT ?? 3000);
 const mqttUrl = process.env.MQTT_URL ?? 'mqtt://localhost:1883';
 const mqttUsername = process.env.MQTT_USERNAME ?? 'backend';
@@ -255,6 +257,13 @@ async function initDb() {
       action text not null,
       payload jsonb not null default '{}'
     );
+
+    create table if not exists push_subscriptions (
+      endpoint text primary key,
+      created_at timestamptz not null default now(),
+      p256dh text not null,
+      auth text not null
+    );
   `);
 
   await pool.query('alter table devices add column if not exists config_desired jsonb');
@@ -308,6 +317,14 @@ async function createAlert(deviceId: string, level: string, type: string, messag
     [deviceId, level, type, message, payload],
   );
   await auditLog(deviceId, 'system', 'alert', `alert.${type}`, { level, message });
+  if (level === 'critical' || level === 'warning') {
+    pushService.broadcast({
+      title: `CatFeeder – ${type.replace(/_/g, ' ')}`,
+      body: `${message} [${deviceId}]`,
+      tags: [level, type],
+      priority: level === 'critical' ? 'high' : 'default',
+    }).catch((err: Error) => console.error('[push]', err.message));
+  }
   sendEvent('alert', alert);
 }
 
@@ -609,6 +626,11 @@ async function startMqtt() {
 
 async function main() {
   await initDb();
+  // Web-Push-Subscriptions aus DB laden
+  const subRows = await pool.query(
+    'select endpoint, p256dh, auth from push_subscriptions',
+  );
+  pushService.loadSubscriptions(subRows.rows);
   await startMqtt();
   setInterval(() => {
     checkOfflineDevices().catch((err) => console.error('[offline-check]', err));
@@ -794,6 +816,48 @@ async function main() {
     const { id } = request.params as { id: string };
     await clearAlerts(id);
     return serializeDevice(await hydrateDevice(id));
+  });
+
+  // ── Push-Endpunkte ───────────────────────────────────────────────────────
+
+  app.get('/api/push/config', async () => ({
+    vapidPublicKey: pushService.vapidPublicKey || null,
+    webPushEnabled: pushService.hasVapid(),
+    ntfyEnabled: pushService.hasNtfy(),
+    ntfyUrl: process.env.NTFY_URL ?? null,
+    subscriptions: pushService.subscriptionCount(),
+  }));
+
+  app.post('/api/push/subscribe', async (request) => {
+    const sub = request.body as WebPushSubscription;
+    if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) {
+      throw new Error('Ungültige Subscription');
+    }
+    pushService.addSubscription(sub);
+    await pool.query(
+      `insert into push_subscriptions (endpoint, p256dh, auth) values ($1, $2, $3)
+       on conflict (endpoint) do update set p256dh = excluded.p256dh, auth = excluded.auth`,
+      [sub.endpoint, sub.keys.p256dh, sub.keys.auth],
+    );
+    return { ok: true };
+  });
+
+  app.delete('/api/push/subscribe', async (request) => {
+    const body = request.body as { endpoint?: string };
+    if (!body?.endpoint) throw new Error('endpoint fehlt');
+    pushService.removeSubscription(body.endpoint);
+    await pool.query('delete from push_subscriptions where endpoint = $1', [body.endpoint]);
+    return { ok: true };
+  });
+
+  app.post('/api/push/test', async () => {
+    await pushService.broadcast({
+      title: 'CatFeeder Test',
+      body: 'Testbenachrichtigung – Push funktioniert.',
+      tags: ['test'],
+      priority: 'default',
+    });
+    return { ok: true };
   });
 
   await app.listen({ host: '0.0.0.0', port });

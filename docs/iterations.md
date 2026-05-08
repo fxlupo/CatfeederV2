@@ -1,5 +1,78 @@
 # Iterationen
 
+## 2026-05-08 - Push-Strategie vorbereitet (Platform 0.5.1)
+
+Scope:
+
+- Plattform-Version auf `0.5.1` gesetzt.
+- `PushService` in `platform/backend/src/push.ts` als eigenständiges Modul.
+
+**Provider: ntfy.sh**
+- Kein Infrastructure-Overhead. URL in `.env` als `NTFY_URL=https://ntfy.sh/<kanal>`.
+- `createAlert()` sendet automatisch bei level=critical/warning.
+- Title, Tags und Priority werden gesetzt.
+
+**Provider: Web Push (VAPID)**
+- VAPID-Schlüssel via `npx web-push generate-vapid-keys`, in `.env` als
+  `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_CONTACT`.
+- Subscriptions in `push_subscriptions` Postgres-Tabelle persistiert.
+- Beim Start werden gespeicherte Subscriptions geladen.
+- Abgelaufene Subscriptions (HTTP 410) werden automatisch entfernt.
+
+**Service Worker** (`public/sw.js`):
+- Cache-Version auf `0.5.1` aktualisiert.
+- `push`-Event-Handler: zeigt Notification mit Title/Body/Icon.
+- `notificationclick`: bringt App-Fenster in den Vordergrund oder öffnet neues.
+
+**Backend-Endpunkte:**
+- `GET  /api/push/config`         – VAPID-Key, Provider-Status, Subscription-Anzahl
+- `POST /api/push/subscribe`      – Web-Push-Subscription registrieren
+- `DELETE /api/push/subscribe`    – Subscription entfernen
+- `POST /api/push/test`           – Testbenachrichtigung an alle aktiven Provider
+
+**Frontend: neuer „Push"-Tab**
+- ntfy.sh: Kanal-URL anzeigen, Testbutton.
+- Web Push: Status-Badge (Aktiv/Nicht aktiviert/Verweigert), Aktivieren-/Deaktivieren-Button.
+- Konfigurationsanleitung wenn Provider nicht gesetzt.
+- `urlBase64ToUint8Array()` für VAPID-Key-Konvertierung.
+
+Verifikation:
+
+- Backend- und Frontend-Build erfolgreich.
+
+## 2026-05-08 - Command-/Audit-Log gehärtet (Platform 0.5.0)
+
+Scope:
+
+- Plattform-Version auf `0.5.0` gesetzt.
+
+**audit_log-Tabelle:**
+- Felder: device_id, actor (device|remote-ui|system), category
+  (feed|config|connectivity|command|alert), action, payload.
+- Index auf (device_id, id desc).
+- Neue Funktion `auditLog()` wird an allen signifikanten Stellen aufgerufen:
+  feed.issued/completed/aborted, config.sent/reported/confirmed/failed,
+  command-Timeouts, device.online/offline, alert.created, commands.cleared.
+
+**command_log – permanente History:**
+- `clearTerminalCommands()` löscht nicht mehr aus der Datenbank.
+- Nur der In-Memory-State wird bereinigt (reine Ansichtsfunktion).
+- DB-Records bleiben als lückenloses Audit-Trail erhalten.
+
+**Neue API-Endpunkte:**
+- `GET /api/devices/:id/audit`     – Audit-Log, paginiert, optional nach category gefiltert
+- `GET /api/devices/:id/commands`  – Command-Verlauf, paginiert, optional nach state gefiltert
+
+**Frontend – History-Tab:**
+- „Feed-Events"-Panel (wie bisher) + neues „Audit-Log"-Panel.
+- Actor- und Category-Badges mit farblicher Bedeutung.
+- Automatisch geladen beim Wechsel auf den History-Tab.
+- Aktualisieren-Button.
+
+Verifikation:
+
+- Backend- und Frontend-Build erfolgreich.
+
 ## 2026-05-08 - Iteration 3 Config-Formular entkoppelt (Platform 0.4.1)
 
 Scope:

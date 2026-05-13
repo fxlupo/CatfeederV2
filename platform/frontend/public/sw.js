@@ -1,4 +1,4 @@
-const CACHE_NAME = 'catfeeder-ui-0.6.0';
+const CACHE_NAME = 'catfeeder-ui-0.7.0';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/catfeeder-icon.svg'];
 
 self.addEventListener('install', (event) => {

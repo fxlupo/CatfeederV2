@@ -6,6 +6,7 @@ Docker-Stack fuer Iteration 2:
 - Backend mit MQTT-Bridge, REST-API, SSE und Postgres-Persistenz
 - React UI hinter Nginx
 - optionaler Traefik-Override fuer externen HTTPS-Zugriff
+- Capture-Speicher fuer ESP32-CAM Fotos
 
 Postgres-Zugangsdaten werden als einzelne Umgebungsvariablen an das Backend
 gegeben, nicht als zusammengesetzte URL. Dadurch funktionieren Passwoerter mit
@@ -46,6 +47,41 @@ Der Scheduler bleibt auf dem ESP. Die Plattform sendet geaenderte
 Fuetterungszeiten per MQTT `cmd/config/set` an die Firmware. Der ESP speichert
 die Konfiguration danach persistent im NVS.
 
+## ESP32-CAM Foto-Pipeline
+
+Iteration 4 startet bewusst mit Fotos statt Live-Video. Die Kamera bleibt nur
+ausgehend aktiv:
+
+1. Backend sendet ein MQTT-Kommando auf `catfeeder/{MQTT_CAMERA_ID}/cmd/capture`.
+2. ESP32-CAM nimmt ein JPEG auf.
+3. ESP32-CAM lädt das JPEG per HTTP `POST` ans Backend hoch.
+4. Backend speichert Datei und Metadaten und zeigt Fotos in der Historie.
+
+Relevante `.env` Werte:
+
+```text
+MQTT_CAMERA_ID=catfeeder-cam
+MQTT_CAMERA_USER=catfeeder_cam
+MQTT_CAMERA_PASS=catfeeder-camera-change-me
+CAMERA_UPLOAD_TOKEN=catfeeder-camera-token-change-me
+PUBLIC_BASE_URL=https://catfeeder.example.de
+```
+
+Upload-Endpunkt:
+
+```text
+POST /api/devices/:cameraId/captures?deviceId=catfeeder&reason=feed_done&correlationId=...
+Content-Type: image/jpeg
+X-Capture-Token: <CAMERA_UPLOAD_TOKEN>
+```
+
+Bildabruf:
+
+```text
+GET /api/captures/:id/image
+GET /api/devices/:id/captures
+```
+
 ## Traefik
 
 Wenn Traefik bereits das externe Docker-Netz `proxy` nutzt:
@@ -76,6 +112,9 @@ PUT  /api/devices/:id/config
 POST /api/devices/:id/feed
 GET  /api/devices/:id/feed-log
 GET  /api/devices/:id/telemetry
+GET  /api/devices/:id/captures
+GET  /api/captures/:id/image
+POST /api/devices/:cameraId/captures
 ```
 
 ## MQTT Topics
@@ -98,4 +137,5 @@ Backend published:
 catfeeder/{deviceId}/cmd/feed
 catfeeder/{deviceId}/cmd/config/get
 catfeeder/{deviceId}/cmd/config/set
+catfeeder/{cameraId}/cmd/capture
 ```

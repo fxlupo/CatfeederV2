@@ -3,16 +3,24 @@ import Fastify from 'fastify';
 import mqtt, { MqttClient } from 'mqtt';
 import pg from 'pg';
 import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { PushService, type WebPushSubscription } from './push.js';
 
 const { Pool } = pg;
 
-const platformVersion = '0.6.0';
+const platformVersion = '0.7.0';
 const pushService = new PushService();
 const port = Number(process.env.PORT ?? 3000);
 const mqttUrl = process.env.MQTT_URL ?? 'mqtt://localhost:1883';
 const mqttUsername = process.env.MQTT_USERNAME ?? 'backend';
 const mqttPassword = process.env.MQTT_PASSWORD ?? '';
+const defaultDeviceId = process.env.MQTT_DEVICE_ID ?? 'catfeeder';
+const cameraDeviceId = process.env.CAMERA_DEVICE_ID ?? 'catfeeder-cam';
+const cameraLinkedDeviceId = process.env.CAMERA_LINKED_DEVICE_ID ?? defaultDeviceId;
+const publicBaseUrl = (process.env.PUBLIC_BASE_URL ?? '').replace(/\/$/, '');
+const captureUploadToken = process.env.CAMERA_UPLOAD_TOKEN ?? '';
+const capturesDir = process.env.CAPTURES_DIR ?? '/data/captures';
 const dbHost = process.env.POSTGRES_HOST ?? 'db';
 const dbPort = Number(process.env.POSTGRES_PORT ?? 5432);
 const dbName = process.env.POSTGRES_DB ?? 'catfeeder';
@@ -37,6 +45,19 @@ type CommandState = {
   payload: JsonMap;
 };
 
+type CaptureState = {
+  id: string;
+  cameraId: string;
+  deviceId: string;
+  createdAt: string;
+  reason: string;
+  correlationId?: string;
+  feedEventId?: string;
+  imageUrl: string;
+  mimeType: string;
+  bytes: number;
+};
+
 type ConfigSync = {
   state: 'unknown' | 'synced' | 'pending' | 'drift';
   desiredUpdatedAt?: string;
@@ -56,6 +77,7 @@ type DeviceState = {
   configDesired?: JsonMap;
   configSync?: ConfigSync;
   feedLog: JsonMap[];
+  captures: CaptureState[];
   alerts: JsonMap[];
   commands: CommandState[];
 };
@@ -82,7 +104,7 @@ function nowIso() {
 function getDevice(deviceId: string) {
   let device = devices.get(deviceId);
   if (!device) {
-    device = { id: deviceId, feedLog: [], alerts: [], commands: [] };
+    device = { id: deviceId, feedLog: [], captures: [], alerts: [], commands: [] };
     devices.set(deviceId, device);
   }
   return device;
@@ -192,7 +214,7 @@ function updateConfigSync(device: DeviceState) {
 async function auditLog(
   deviceId: string,
   actor: 'device' | 'remote-ui' | 'system',
-  category: 'feed' | 'config' | 'connectivity' | 'command' | 'alert' | 'push',
+  category: 'feed' | 'config' | 'connectivity' | 'command' | 'alert' | 'push' | 'capture',
   action: string,
   payload: JsonMap = {},
 ) {
@@ -275,12 +297,27 @@ async function initDb() {
       p256dh text not null,
       auth text not null
     );
+
+    create table if not exists captures (
+      id text primary key,
+      camera_id text not null,
+      device_id text not null,
+      created_at timestamptz not null default now(),
+      reason text not null,
+      correlation_id text,
+      feed_event_id text,
+      file_path text not null,
+      mime_type text not null,
+      bytes integer not null
+    );
   `);
 
   await pool.query('alter table devices add column if not exists config_desired jsonb');
   await pool.query('alter table devices add column if not exists config_desired_at timestamptz');
   await pool.query('alter table devices add column if not exists config_reported_at timestamptz');
   await pool.query('create index if not exists audit_log_device_id_idx on audit_log(device_id, id desc)');
+  await pool.query('create index if not exists captures_device_id_idx on captures(device_id, created_at desc)');
+  await pool.query('create index if not exists captures_camera_id_idx on captures(camera_id, created_at desc)');
 }
 
 async function upsertDevice(deviceId: string, field: 'status' | 'telemetry' | 'config_reported', payload: JsonMap) {
@@ -446,6 +483,56 @@ function publishCommand(deviceId: string, suffix: string, payload: JsonMap) {
   mqttClient.publish(topic, JSON.stringify(payload), { qos: 1 });
 }
 
+function captureImageUrl(captureId: string) {
+  return `/api/captures/${encodeURIComponent(captureId)}/image`;
+}
+
+function captureUploadUrl(cameraId: string) {
+  const pathPart = `/api/devices/${encodeURIComponent(cameraId)}/captures`;
+  return publicBaseUrl ? `${publicBaseUrl}${pathPart}` : pathPart;
+}
+
+function safePathSegment(value: string) {
+  return value.replace(/[^a-zA-Z0-9_.-]/g, '_').slice(0, 80) || 'unknown';
+}
+
+async function rememberCapture(capture: CaptureState) {
+  const device = getDevice(capture.deviceId);
+  const existing = device.captures.findIndex((item) => item.id === capture.id);
+  if (existing >= 0) device.captures[existing] = capture;
+  else device.captures.unshift(capture);
+  if (device.captures.length > 100) device.captures.length = 100;
+}
+
+async function publishCaptureCommand(
+  deviceId: string,
+  reason: string,
+  correlationId?: string,
+  feedEventId?: string,
+) {
+  if (!cameraDeviceId) return;
+  const id = randomUUID();
+  const payload: JsonMap = {
+    id,
+    type: 'capture',
+    reason,
+    deviceId,
+    correlationId: correlationId ?? id,
+    uploadUrl: captureUploadUrl(cameraDeviceId),
+    issuedAt: nowIso(),
+  };
+  if (feedEventId) payload.feedEventId = feedEventId;
+  publishCommand(cameraDeviceId, 'cmd/capture', payload);
+  await auditLog(deviceId, 'system', 'capture', 'capture.requested', {
+    captureCommandId: id,
+    cameraId: cameraDeviceId,
+    reason,
+    correlationId: payload.correlationId,
+    feedEventId,
+  });
+  sendEvent('capture', { deviceId, cameraId: cameraDeviceId, requested: true, payload });
+}
+
 async function rejectCommand(deviceId: string, type: 'feed' | 'config', message: string) {
   const command: CommandState = {
     id: randomUUID(),
@@ -499,6 +586,22 @@ async function hydrateDevice(deviceId: string) {
       [deviceId],
     );
     device.feedLog = rows.rows.map((row) => ({ ...row.payload, receivedAt: row.createdAt }));
+  }
+
+  if (device.captures.length === 0) {
+    const rows = await pool.query(
+      `select id, camera_id as "cameraId", device_id as "deviceId",
+              created_at as "createdAt", reason, correlation_id as "correlationId",
+              feed_event_id as "feedEventId", mime_type as "mimeType", bytes
+       from captures
+       where device_id = $1 or camera_id = $1
+       order by created_at desc limit 100`,
+      [deviceId],
+    );
+    device.captures = rows.rows.map((row) => ({
+      ...row,
+      imageUrl: captureImageUrl(row.id),
+    }));
   }
 
   if (device.alerts.length === 0) {
@@ -594,13 +697,22 @@ async function handleMqttMessage(topic: string, raw: Buffer) {
     if (channel === 'feed/log') {
       device.feedLog.push({ ...payload, receivedAt: nowIso() });
       trim(device.feedLog, 100);
-      await pool.query('insert into feed_events (device_id, payload) values ($1, $2)', [deviceId, payload]);
+      const feedInsert = await pool.query(
+        'insert into feed_events (device_id, payload) values ($1, $2) returning id',
+        [deviceId, payload],
+      );
       const action = payload.aborted === true ? 'feed.aborted' : 'feed.completed';
       await auditLog(deviceId, 'device', 'feed', action, {
         grams: payload.grams,
         servo: payload.servo,
         blockRetries: payload.blockRetryCount,
       });
+      await publishCaptureCommand(
+        deviceId,
+        payload.aborted === true ? 'feed_aborted' : 'feed_done',
+        String(payload.commandId ?? payload.id ?? feedInsert.rows[0]?.id ?? randomUUID()),
+        String(feedInsert.rows[0]?.id ?? ''),
+      );
     }
     sendEvent('feed', serializeDevice(device));
     if (payload.aborted === true || payload.type === 'feed_aborted') {
@@ -690,6 +802,12 @@ async function main() {
 
   const app = Fastify({ logger: true });
   await app.register(cors, { origin: true });
+  app.addContentTypeParser('image/jpeg', { parseAs: 'buffer' }, (_request, body, done) => {
+    done(null, body);
+  });
+  app.addContentTypeParser('image/jpg', { parseAs: 'buffer' }, (_request, body, done) => {
+    done(null, body);
+  });
 
   app.get('/api/health', async () => ({
     ok: true,
@@ -700,6 +818,8 @@ async function main() {
     commandTimeoutMs,
     alertOfflineAfterMs,
     alertCooldownMs,
+    cameraDeviceId,
+    captureUploadEnabled: true,
   }));
 
   app.get('/api/events', async (_request, reply) => {
@@ -738,6 +858,115 @@ async function main() {
       [id],
     );
     return rows.rows;
+  });
+
+  app.get('/api/devices/:id/captures', async (request) => {
+    const { id } = request.params as { id: string };
+    const query = request.query as { limit?: string };
+    const limit = Math.min(100, Number(query.limit ?? 50));
+    const rows = await pool.query(
+      `select id, camera_id as "cameraId", device_id as "deviceId",
+              created_at as "createdAt", reason, correlation_id as "correlationId",
+              feed_event_id as "feedEventId", mime_type as "mimeType", bytes
+       from captures
+       where device_id = $1 or camera_id = $1
+       order by created_at desc limit $2`,
+      [id, limit],
+    );
+    return rows.rows.map((row) => ({ ...row, imageUrl: captureImageUrl(row.id) }));
+  });
+
+  app.get('/api/captures/:id/image', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const row = await pool.query(
+      'select file_path as "filePath", mime_type as "mimeType" from captures where id = $1',
+      [id],
+    );
+    if (!row.rows[0]) {
+      reply.code(404);
+      return { error: 'capture-not-found' };
+    }
+    const image = await readFile(row.rows[0].filePath);
+    reply.header('Cache-Control', 'private, max-age=3600');
+    reply.type(row.rows[0].mimeType);
+    return reply.send(image);
+  });
+
+  app.post('/api/devices/:cameraId/captures', async (request, reply) => {
+    const { cameraId } = request.params as { cameraId: string };
+    const query = request.query as {
+      deviceId?: string;
+      reason?: string;
+      correlationId?: string;
+      feedEventId?: string;
+      token?: string;
+    };
+    const headerToken = request.headers['x-capture-token'];
+    const providedToken = Array.isArray(headerToken) ? headerToken[0] : headerToken ?? query.token ?? '';
+    if (captureUploadToken && providedToken !== captureUploadToken) {
+      await auditLog(cameraLinkedDeviceId, 'device', 'capture', 'capture.rejected', {
+        cameraId,
+        reason: 'invalid-token',
+      });
+      reply.code(401);
+      return { ok: false, error: 'invalid-token' };
+    }
+    if (!Buffer.isBuffer(request.body)) {
+      reply.code(400);
+      return { ok: false, error: 'jpeg-body-required' };
+    }
+
+    const body = request.body;
+    const id = randomUUID();
+    const deviceId = String(query.deviceId ?? cameraLinkedDeviceId);
+    const reason = String(query.reason ?? 'manual');
+    const day = new Date().toISOString().slice(0, 10);
+    const dir = path.join(capturesDir, safePathSegment(cameraId), day);
+    const filePath = path.join(dir, `${safePathSegment(id)}.jpg`);
+    await mkdir(dir, { recursive: true });
+    await writeFile(filePath, body);
+
+    const row = await pool.query(
+      `insert into captures
+         (id, camera_id, device_id, reason, correlation_id, feed_event_id, file_path, mime_type, bytes)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       returning created_at as "createdAt"`,
+      [
+        id,
+        cameraId,
+        deviceId,
+        reason,
+        query.correlationId ?? null,
+        query.feedEventId ?? null,
+        filePath,
+        'image/jpeg',
+        body.length,
+      ],
+    );
+
+    const capture: CaptureState = {
+      id,
+      cameraId,
+      deviceId,
+      createdAt: row.rows[0].createdAt.toISOString(),
+      reason,
+      correlationId: query.correlationId,
+      feedEventId: query.feedEventId,
+      imageUrl: captureImageUrl(id),
+      mimeType: 'image/jpeg',
+      bytes: body.length,
+    };
+    await rememberCapture(capture);
+    await auditLog(deviceId, 'device', 'capture', 'capture.uploaded', {
+      captureId: id,
+      cameraId,
+      reason,
+      bytes: body.length,
+      correlationId: query.correlationId,
+      feedEventId: query.feedEventId,
+    });
+    sendEvent('capture', { deviceId, capture });
+    return { ok: true, capture };
   });
 
   // Paginierter Command-Verlauf aus der Datenbank (inkl. älterer terminal states)
@@ -814,6 +1043,7 @@ async function main() {
       servo,
     });
     publishCommand(id, 'cmd/feed', command.payload);
+    await publishCaptureCommand(id, 'feed_command', command.id);
     sendEvent('command', command);
     return command;
   });

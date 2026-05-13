@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Bell,
   CalendarClock,
+  Camera,
   Gauge,
   History,
   Play,
@@ -47,8 +48,21 @@ type Device = {
   configDesired?: Config;
   configSync?: ConfigSync;
   feedLog?: Record<string, any>[];
+  captures?: Capture[];
   alerts?: Record<string, any>[];
   commands?: Record<string, any>[];
+};
+type Capture = {
+  id: string;
+  cameraId: string;
+  deviceId: string;
+  createdAt: string;
+  reason: string;
+  correlationId?: string;
+  feedEventId?: string;
+  imageUrl: string;
+  mimeType: string;
+  bytes: number;
 };
 type ConfigSync = {
   state?: 'unknown' | 'synced' | 'pending' | 'drift';
@@ -101,7 +115,7 @@ function App() {
   const [feedGrams, setFeedGrams] = useState(5);
   const [feedServo, setFeedServo] = useState(0);
   const [notice, setNotice] = useState('');
-  const [platformVersion, setPlatformVersion] = useState('0.6.0');
+  const [platformVersion, setPlatformVersion] = useState('0.7.0');
   const [configDirty, setConfigDirty] = useState(false);
   const configDirtyRef = useRef(false);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
@@ -127,7 +141,7 @@ function App() {
     setConfigDirty(false);
     loadDevice().catch(() => undefined);
     api.get<Health>('/api/health')
-      .then((health) => setPlatformVersion(health.platformVersion ?? '0.6.0'))
+      .then((health) => setPlatformVersion(health.platformVersion ?? '0.7.0'))
       .catch(() => undefined);
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => undefined);
@@ -138,6 +152,7 @@ function App() {
     source.addEventListener('telemetry', refresh);
     source.addEventListener('config', refresh);
     source.addEventListener('feed', refresh);
+    source.addEventListener('capture', refresh);
     source.addEventListener('alert', refresh);
     source.addEventListener('command', refresh);
     return () => source.close();
@@ -415,6 +430,22 @@ function App() {
               </div>
             ))}
             {(device.feedLog ?? []).length === 0 && <p className="muted">Noch keine Feed-Events</p>}
+          </Panel>
+
+          <Panel title="Fotos" icon={<Camera size={18} />} wide>
+            {(device.captures ?? []).length > 0 ? (
+              <div className="capture-grid">
+                {(device.captures ?? []).slice(0, 24).map((capture) => (
+                  <a className="capture-card" href={capture.imageUrl} target="_blank" rel="noreferrer" key={capture.id}>
+                    <img src={capture.imageUrl} alt={`Capture ${formatDate(capture.createdAt)}`} loading="lazy" />
+                    <span>{capture.reason}</span>
+                    <small>{capture.cameraId} · {formatDate(capture.createdAt)}</small>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <p className="muted">Noch keine Fotos vorhanden</p>
+            )}
           </Panel>
 
           <Panel title="Audit-Log" icon={<Activity size={18} />} wide>

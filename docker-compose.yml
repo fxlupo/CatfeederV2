@@ -8,6 +8,9 @@ services:
       MQTT_DEVICE_USER: ${MQTT_DEVICE_USER:-catfeeder}
       MQTT_DEVICE_PASS: ${MQTT_DEVICE_PASS:-catfeeder-device-change-me}
       MQTT_DEVICE_ID: ${MQTT_DEVICE_ID:-catfeeder}
+      MQTT_CAMERA_USER: ${MQTT_CAMERA_USER:-catfeeder_cam}
+      MQTT_CAMERA_PASS: ${MQTT_CAMERA_PASS:-catfeeder-camera-change-me}
+      MQTT_CAMERA_ID: ${MQTT_CAMERA_ID:-catfeeder-cam}
       MQTT_BACKEND_USER: ${MQTT_BACKEND_USER:-backend}
       MQTT_BACKEND_PASS: ${MQTT_BACKEND_PASS:-catfeeder-backend-change-me}
     volumes:
@@ -20,8 +23,9 @@ services:
       - |
         rm -f /mosquitto/data/mosquitto_passwords /mosquitto/data/mosquitto_acl
         mosquitto_passwd -b -c /mosquitto/data/mosquitto_passwords "$$MQTT_DEVICE_USER" "$$MQTT_DEVICE_PASS"
+        mosquitto_passwd -b /mosquitto/data/mosquitto_passwords "$$MQTT_CAMERA_USER" "$$MQTT_CAMERA_PASS"
         mosquitto_passwd -b /mosquitto/data/mosquitto_passwords "$$MQTT_BACKEND_USER" "$$MQTT_BACKEND_PASS"
-        printf "user %s\ntopic readwrite catfeeder/%s/#\n\nuser %s\ntopic readwrite catfeeder/#\n" "$$MQTT_DEVICE_USER" "$$MQTT_DEVICE_ID" "$$MQTT_BACKEND_USER" > /mosquitto/data/mosquitto_acl
+        printf "user %s\ntopic readwrite catfeeder/%s/#\n\nuser %s\ntopic readwrite catfeeder/%s/#\n\nuser %s\ntopic readwrite catfeeder/#\n" "$$MQTT_DEVICE_USER" "$$MQTT_DEVICE_ID" "$$MQTT_CAMERA_USER" "$$MQTT_CAMERA_ID" "$$MQTT_BACKEND_USER" > /mosquitto/data/mosquitto_acl
         chown mosquitto:mosquitto /mosquitto/data/mosquitto_passwords /mosquitto/data/mosquitto_acl
         chmod 640 /mosquitto/data/mosquitto_passwords /mosquitto/data/mosquitto_acl
         exec mosquitto -c /mosquitto/config/mosquitto.conf
@@ -56,6 +60,12 @@ services:
       MQTT_URL: mqtt://mqtt:1883
       MQTT_USERNAME: ${MQTT_BACKEND_USER:-backend}
       MQTT_PASSWORD: ${MQTT_BACKEND_PASS:-catfeeder-backend-change-me}
+      MQTT_DEVICE_ID: ${MQTT_DEVICE_ID:-catfeeder}
+      CAMERA_DEVICE_ID: ${MQTT_CAMERA_ID:-catfeeder-cam}
+      CAMERA_LINKED_DEVICE_ID: ${MQTT_DEVICE_ID:-catfeeder}
+      CAMERA_UPLOAD_TOKEN: ${CAMERA_UPLOAD_TOKEN:-catfeeder-camera-token-change-me}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      CAPTURES_DIR: /data/captures
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-catfeeder}
@@ -67,6 +77,8 @@ services:
       VAPID_CONTACT: ${VAPID_CONTACT:-}
       ALERT_OFFLINE_AFTER_MS: ${ALERT_OFFLINE_AFTER_MS:-180000}
       ALERT_COOLDOWN_MS: ${ALERT_COOLDOWN_MS:-3600000}
+    volumes:
+      - captures-data:/data/captures
     ports:
       - "${BACKEND_PORT:-3000}:3000"
 
@@ -83,3 +95,4 @@ volumes:
   mqtt-data:
   mqtt-log:
   postgres-data:
+  captures-data:

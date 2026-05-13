@@ -673,7 +673,7 @@ Naechster Block in Iteration 3:
 
 ### Iteration 4 - Camera Capture Pipeline
 
-Status: geplant
+Status: Backend/UI-Basis umgesetzt in Platform `0.7.0`; ESP32-CAM Firmware folgt.
 
 Ziel:
 

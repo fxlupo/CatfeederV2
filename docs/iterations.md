@@ -1,5 +1,29 @@
 # Iterationen
 
+## 2026-05-14 - Iteration 4 Capture-Backend und UI-Basis (Platform 0.7.0)
+
+Scope:
+
+- Plattform-Version auf `0.7.0` gesetzt.
+- Backend kann ESP32-CAM JPEG-Fotos per HTTP entgegennehmen.
+- Neue `captures`-Tabelle speichert Metadaten zu Kamera, Device, Reason,
+  Korrelation, Dateipfad, MIME-Type und Dateigröße.
+- Capture-Dateien werden in einem Docker-Volume unter `/data/captures`
+  gespeichert.
+- Neue API-Endpunkte:
+  - `POST /api/devices/:cameraId/captures`
+  - `GET /api/devices/:id/captures`
+  - `GET /api/captures/:id/image`
+- Backend sendet MQTT-Capture-Kommandos an `catfeeder/{cameraId}/cmd/capture`
+  bei Remote-Fütterung und Feed-Log Events.
+- Mosquitto-ACL und Docker Compose kennen einen getrennten Kamera-User.
+- React UI zeigt Fotos im Historie-Tab.
+- Service-Worker-Cache auf `0.7.0` aktualisiert.
+
+Verifikation:
+
+- Backend- und Frontend-Build lokal pruefen.
+
 ## 2026-05-14 - Iteration 4 Camera Capture Pipeline geplant
 
 Scope:

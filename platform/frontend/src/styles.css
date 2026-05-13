@@ -334,6 +334,40 @@ small {
   color: #875f13;
 }
 
+.capture-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+
+.capture-card {
+  border: 1px solid #edf0f3;
+  border-radius: 8px;
+  color: inherit;
+  display: grid;
+  gap: 7px;
+  overflow: hidden;
+  padding-bottom: 10px;
+  text-decoration: none;
+}
+
+.capture-card img {
+  aspect-ratio: 4 / 3;
+  background: #edf0f3;
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+
+.capture-card span,
+.capture-card small {
+  padding: 0 10px;
+}
+
+.capture-card span {
+  font-weight: 700;
+}
+
 .command {
   align-items: center;
   border-bottom: 1px solid #edf0f3;
@@ -460,6 +494,10 @@ small {
     gap: 8px;
     grid-template-columns: 1fr 160px 180px;
     padding: 10px 0;
+  }
+
+  .capture-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .command {

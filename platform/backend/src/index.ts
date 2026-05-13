@@ -7,7 +7,7 @@ import { PushService, type WebPushSubscription } from './push.js';
 
 const { Pool } = pg;
 
-const platformVersion = '0.5.2';
+const platformVersion = '0.6.0';
 const pushService = new PushService();
 const port = Number(process.env.PORT ?? 3000);
 const mqttUrl = process.env.MQTT_URL ?? 'mqtt://localhost:1883';
@@ -20,6 +20,8 @@ const dbUser = process.env.POSTGRES_USER ?? 'catfeeder';
 const dbPassword = process.env.POSTGRES_PASSWORD ?? 'catfeeder';
 const offlineAfterMs = Number(process.env.DEVICE_OFFLINE_AFTER_MS ?? 30000);
 const commandTimeoutMs = Number(process.env.COMMAND_TIMEOUT_MS ?? 120000);
+const alertOfflineAfterMs = Number(process.env.ALERT_OFFLINE_AFTER_MS ?? 180000);
+const alertCooldownMs = Number(process.env.ALERT_COOLDOWN_MS ?? 3600000);
 
 type JsonMap = Record<string, unknown>;
 
@@ -61,6 +63,8 @@ type DeviceState = {
 const devices = new Map<string, DeviceState>();
 const sseClients = new Set<NodeJS.WritableStream>();
 const offlineAlerted = new Set<string>();
+const activeAlertStates = new Set<string>();
+const lastAlertAt = new Map<string, number>();
 const terminalCommandStates = new Set(['done', 'timeout', 'aborted', 'rejected']);
 const pool = new Pool({
   host: dbHost,
@@ -92,6 +96,7 @@ function markDeviceSeen(deviceId: string) {
   device.seenAt = nowIso();
   if (wasOffline || offlineAlerted.has(deviceId)) {
     offlineAlerted.delete(deviceId);
+    resetAlertState(deviceId, 'device_offline');
     auditLog(deviceId, 'device', 'connectivity', 'device.online', {
       seenAt: device.seenAt,
     }).catch(() => undefined);
@@ -335,14 +340,43 @@ async function createAlert(deviceId: string, level: string, type: string, messag
   sendEvent('alert', alert);
 }
 
+function alertKey(deviceId: string, type: string) {
+  return `${deviceId}:${type}`;
+}
+
+function resetAlertState(deviceId: string, type: string) {
+  activeAlertStates.delete(alertKey(deviceId, type));
+}
+
+function canCreateStateAlert(deviceId: string, type: string) {
+  const key = alertKey(deviceId, type);
+  if (activeAlertStates.has(key)) return false;
+
+  const last = lastAlertAt.get(key) ?? 0;
+  if (Date.now() - last < alertCooldownMs) return false;
+
+  activeAlertStates.add(key);
+  lastAlertAt.set(key, Date.now());
+  return true;
+}
+
+async function createStateAlert(deviceId: string, level: string, type: string, message: string, payload: JsonMap) {
+  if (!canCreateStateAlert(deviceId, type)) return false;
+  await createAlert(deviceId, level, type, message, payload);
+  return true;
+}
+
 async function checkOfflineDevices() {
   for (const device of devices.values()) {
-    if (!device.seenAt || isOnline(device) || offlineAlerted.has(device.id)) continue;
-    offlineAlerted.add(device.id);
+    if (!device.seenAt) continue;
     const ageSeconds = Math.round((Date.now() - new Date(device.seenAt).getTime()) / 1000);
+    if (ageSeconds * 1000 < alertOfflineAfterMs) continue;
+    if (offlineAlerted.has(device.id)) continue;
+    offlineAlerted.add(device.id);
     await createAlert(device.id, 'warning', 'device_offline', 'Device offline', {
       seenAt: device.seenAt,
       ageSeconds,
+      thresholdSeconds: Math.round(alertOfflineAfterMs / 1000),
     });
     await auditLog(device.id, 'system', 'connectivity', 'device.offline', {
       seenAt: device.seenAt,
@@ -518,8 +552,17 @@ async function handleMqttMessage(topic: string, raw: Buffer) {
     await upsertDevice(deviceId, 'telemetry', payload);
     await pool.query('insert into telemetry (device_id, payload) values ($1, $2)', [deviceId, payload]);
     sendEvent('telemetry', serializeDevice(device));
-    if (payload.fillLow === true) await createAlert(deviceId, 'warning', 'fill_low', 'Fuellstand niedrig', payload);
-    if (payload.overcurrent === true) await createAlert(deviceId, 'critical', 'overcurrent', 'Ueberstrom erkannt', payload);
+    if (payload.fillLow === true) {
+      await createStateAlert(deviceId, 'warning', 'fill_low', 'Fuellstand niedrig', payload);
+    } else {
+      resetAlertState(deviceId, 'fill_low');
+    }
+
+    if (payload.overcurrent === true) {
+      await createStateAlert(deviceId, 'critical', 'overcurrent', 'Ueberstrom erkannt', payload);
+    } else {
+      resetAlertState(deviceId, 'overcurrent');
+    }
     return;
   }
 
@@ -655,6 +698,8 @@ async function main() {
     devices: devices.size,
     offlineAfterMs,
     commandTimeoutMs,
+    alertOfflineAfterMs,
+    alertCooldownMs,
   }));
 
   app.get('/api/events', async (_request, reply) => {

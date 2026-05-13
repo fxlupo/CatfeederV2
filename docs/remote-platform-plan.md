@@ -581,6 +581,11 @@ Aktueller Implementierungsstand:
   - Lockfiles korrigiert.
   - Abgelaufene Web-Push-Subscriptions werden auch aus Postgres entfernt.
   - Push-Subscribe/Test/Unsubscribe und Alert-Clearing schreiben Audit-Events.
+- Plattform-Version `0.6.0`:
+  - Alert-Regeln von UI-Online-Status entkoppelt.
+  - Offline-Push/Alert erst nach `ALERT_OFFLINE_AFTER_MS`.
+  - `fill_low` und `overcurrent` sind zustandsbasiert mit Cooldown, um
+    Push-Spam zu vermeiden.
 
 Umfang:
 
@@ -648,7 +653,7 @@ Akzeptanz:
 
 Naechster Block in Iteration 3:
 
-1. Push auf NAS mit ntfy.sh testen.
-2. Browser-Push auf Android und iOS-PWA gezielt testen.
-3. Audit-Ansicht filtern/suchbar machen.
-4. PWA auf Android/iOS weiter verfeinern.
+1. Alert-Regeln auf dem NAS mit echtem Offline-Test pruefen.
+2. Push auf NAS mit ntfy.sh testen.
+3. Browser-Push auf Android und iOS-PWA gezielt testen.
+4. Audit-Ansicht filtern/suchbar machen.

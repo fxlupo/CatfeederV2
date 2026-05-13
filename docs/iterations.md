@@ -1,5 +1,25 @@
 # Iterationen
 
+## 2026-05-14 - Alert- und Push-Regeln gehärtet (Platform 0.6.0)
+
+Scope:
+
+- Plattform-Version auf `0.6.0` gesetzt.
+- Alert-Regeln von UI-Online-Status entkoppelt:
+  - `DEVICE_OFFLINE_AFTER_MS` bleibt fuer schnellen UI-Status.
+  - `ALERT_OFFLINE_AFTER_MS` steuert, ab wann Offline einen Alert/Push erzeugt.
+- Neuer Default: Offline-Alert erst nach `180000 ms` statt sofort nach UI-Offline.
+- Zustandsbasierte Alerts fuer `fill_low` und `overcurrent`:
+  - ein Alert pro aktivem Zustand
+  - Reset, wenn Telemetrie wieder normal meldet
+  - Cooldown ueber `ALERT_COOLDOWN_MS`, Default `3600000 ms`
+- `GET /api/health` meldet die aktiven Alert-Timings.
+- Docker Compose und `.env.example` um die neuen Alert-Parameter erweitert.
+
+Verifikation:
+
+- Backend- und Frontend-Build lokal pruefen.
+
 ## 2026-05-13 - Audit/Push nachgeschärft (Platform 0.5.2)
 
 Scope:

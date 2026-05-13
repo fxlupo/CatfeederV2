@@ -1,5 +1,22 @@
 # Iterationen
 
+## 2026-05-13 - Audit/Push nachgeschärft (Platform 0.5.2)
+
+Scope:
+
+- Plattform-Version auf `0.5.2` gesetzt.
+- Backend- und Frontend-`package-lock.json` auf dieselbe Version wie
+  `package.json` gebracht, damit `npm ci`/Docker reproduzierbar bleibt.
+- Web-Push räumt abgelaufene Subscriptions nun auch aus Postgres auf, nicht nur
+  aus dem In-Memory-State.
+- Push-Subscribe, Push-Unsubscribe, Push-Test und abgelaufene Subscriptions
+  werden ins Audit-Log geschrieben.
+- `clearAlerts()` schreibt jetzt ebenfalls einen Audit-Eintrag.
+
+Verifikation:
+
+- Backend- und Frontend-Build lokal pruefen.
+
 ## 2026-05-08 - Push-Strategie vorbereitet (Platform 0.5.1)
 
 Scope:
@@ -30,7 +47,7 @@ Scope:
 - `DELETE /api/push/subscribe`    – Subscription entfernen
 - `POST /api/push/test`           – Testbenachrichtigung an alle aktiven Provider
 
-**Frontend: neuer „Push"-Tab**
+**Frontend: Push-Bereich in „Kalibrierung"**
 - ntfy.sh: Kanal-URL anzeigen, Testbutton.
 - Web Push: Status-Badge (Aktiv/Nicht aktiviert/Verweigert), Aktivieren-/Deaktivieren-Button.
 - Konfigurationsanleitung wenn Provider nicht gesetzt.

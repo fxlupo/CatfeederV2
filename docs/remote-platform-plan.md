@@ -569,6 +569,18 @@ Aktueller Implementierungsstand:
   - UI schuetzt lokale Config-Entwuerfe vor Live-Refresh-Overwrite.
   - Config-Formulare arbeiten bevorzugt auf `configDesired`.
   - Mobile Config-Seiten haben einen Speichern-Button direkt oben.
+- Plattform-Version `0.5.0`:
+  - Persistentes `audit_log` fuer Feed-, Config-, Command-, Alert- und
+    Connectivity-Ereignisse.
+  - Terminale Commands werden nur aus der UI-Ansicht bereinigt, nicht aus der
+    Datenbank-Historie.
+- Plattform-Version `0.5.1`:
+  - Push-Grundlage mit ntfy.sh und Browser Web Push via VAPID.
+  - Push-UI im Kalibrierungsbereich.
+- Plattform-Version `0.5.2`:
+  - Lockfiles korrigiert.
+  - Abgelaufene Web-Push-Subscriptions werden auch aus Postgres entfernt.
+  - Push-Subscribe/Test/Unsubscribe und Alert-Clearing schreiben Audit-Events.
 
 Umfang:
 
@@ -636,7 +648,7 @@ Akzeptanz:
 
 Naechster Block in Iteration 3:
 
-1. Config-Sync auf dem NAS mit echter Slot-Aenderung testen.
-2. Command- und Audit-Log weiter haerten.
-3. Alert- und Push-Strategie fuer Android/iOS festlegen.
+1. Push auf NAS mit ntfy.sh testen.
+2. Browser-Push auf Android und iOS-PWA gezielt testen.
+3. Audit-Ansicht filtern/suchbar machen.
 4. PWA auf Android/iOS weiter verfeinern.

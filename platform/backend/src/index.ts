@@ -7,7 +7,7 @@ import { PushService, type WebPushSubscription } from './push.js';
 
 const { Pool } = pg;
 
-const platformVersion = '0.5.1';
+const platformVersion = '0.5.2';
 const pushService = new PushService();
 const port = Number(process.env.PORT ?? 3000);
 const mqttUrl = process.env.MQTT_URL ?? 'mqtt://localhost:1883';
@@ -187,7 +187,7 @@ function updateConfigSync(device: DeviceState) {
 async function auditLog(
   deviceId: string,
   actor: 'device' | 'remote-ui' | 'system',
-  category: 'feed' | 'config' | 'connectivity' | 'command' | 'alert',
+  category: 'feed' | 'config' | 'connectivity' | 'command' | 'alert' | 'push',
   action: string,
   payload: JsonMap = {},
 ) {
@@ -195,6 +195,12 @@ async function auditLog(
     'insert into audit_log (device_id, actor, category, action, payload) values ($1, $2, $3, $4, $5)',
     [deviceId, actor, category, action, payload],
   ).catch((err: Error) => console.error('[audit]', err.message));
+}
+
+async function cleanupExpiredPushSubscriptions(endpoints: string[]) {
+  if (endpoints.length === 0) return;
+  await pool.query('delete from push_subscriptions where endpoint = any($1)', [endpoints]);
+  await auditLog('platform', 'system', 'push', 'push.subscriptions.expired', { count: endpoints.length });
 }
 
 // ── DB ───────────────────────────────────────────────────────────────────────
@@ -318,12 +324,13 @@ async function createAlert(deviceId: string, level: string, type: string, messag
   );
   await auditLog(deviceId, 'system', 'alert', `alert.${type}`, { level, message });
   if (level === 'critical' || level === 'warning') {
-    pushService.broadcast({
+    const expired = await pushService.broadcast({
       title: `CatFeeder – ${type.replace(/_/g, ' ')}`,
       body: `${message} [${deviceId}]`,
       tags: [level, type],
       priority: level === 'critical' ? 'high' : 'default',
     }).catch((err: Error) => console.error('[push]', err.message));
+    await cleanupExpiredPushSubscriptions(expired ?? []);
   }
   sendEvent('alert', alert);
 }
@@ -388,6 +395,7 @@ async function clearAlerts(deviceId: string) {
   device.alerts = [];
   offlineAlerted.delete(deviceId);
   await pool.query('delete from alerts where device_id = $1', [deviceId]);
+  await auditLog(deviceId, 'remote-ui', 'alert', 'alerts.cleared');
   sendEvent('alert', { deviceId, cleared: true });
 }
 
@@ -839,6 +847,9 @@ async function main() {
        on conflict (endpoint) do update set p256dh = excluded.p256dh, auth = excluded.auth`,
       [sub.endpoint, sub.keys.p256dh, sub.keys.auth],
     );
+    await auditLog('platform', 'remote-ui', 'push', 'push.subscribed', {
+      endpointSuffix: sub.endpoint.slice(-24),
+    });
     return { ok: true };
   });
 
@@ -847,15 +858,22 @@ async function main() {
     if (!body?.endpoint) throw new Error('endpoint fehlt');
     pushService.removeSubscription(body.endpoint);
     await pool.query('delete from push_subscriptions where endpoint = $1', [body.endpoint]);
+    await auditLog('platform', 'remote-ui', 'push', 'push.unsubscribed', {
+      endpointSuffix: body.endpoint.slice(-24),
+    });
     return { ok: true };
   });
 
   app.post('/api/push/test', async () => {
-    await pushService.broadcast({
+    const expired = await pushService.broadcast({
       title: 'CatFeeder Test',
       body: 'Testbenachrichtigung – Push funktioniert.',
       tags: ['test'],
       priority: 'default',
+    });
+    await cleanupExpiredPushSubscriptions(expired);
+    await auditLog('platform', 'remote-ui', 'push', 'push.test', {
+      expiredSubscriptions: expired.length,
     });
     return { ok: true };
   });

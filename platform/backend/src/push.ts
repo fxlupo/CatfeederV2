@@ -60,18 +60,21 @@ export class PushService {
     if (rows.length > 0) console.log(`[push] ${rows.length} Web-Push-Subscriptions geladen`);
   }
 
-  async broadcast(payload: PushPayload): Promise<void> {
-    const jobs: Promise<void>[] = [];
+  async broadcast(payload: PushPayload): Promise<string[]> {
+    const jobs: Promise<string | null>[] = [];
     if (this.ntfyUrl) jobs.push(this.sendNtfy(payload));
     if (this.vapidEnabled) {
       for (const [endpoint, sub] of this.subs) {
         jobs.push(this.sendWebPush(endpoint, sub, payload));
       }
     }
-    await Promise.allSettled(jobs);
+    const results = await Promise.allSettled(jobs);
+    return results
+      .filter((result): result is PromiseFulfilledResult<string> => result.status === 'fulfilled' && typeof result.value === 'string')
+      .map((result) => result.value);
   }
 
-  private async sendNtfy(payload: PushPayload): Promise<void> {
+  private async sendNtfy(payload: PushPayload): Promise<null> {
     try {
       const res = await fetch(this.ntfyUrl!, {
         method: 'POST',
@@ -88,9 +91,10 @@ export class PushService {
     } catch (err) {
       console.error('[push/ntfy]', err);
     }
+    return null;
   }
 
-  private async sendWebPush(endpoint: string, sub: WebPushSubscription, payload: PushPayload): Promise<void> {
+  private async sendWebPush(endpoint: string, sub: WebPushSubscription, payload: PushPayload): Promise<string | null> {
     try {
       await webPushLib.sendNotification(
         { endpoint, keys: sub.keys },
@@ -102,13 +106,16 @@ export class PushService {
         }),
       );
       console.log(`[push/webpush] gesendet → ${endpoint.slice(-30)}`);
+      return null;
     } catch (err: any) {
       console.warn(`[push/webpush] ${err.message}`);
-      // 410 Gone = Subscription abgelaufen, aus Liste entfernen
-      if (err.statusCode === 410) {
+      // 410 Gone / 404 Not Found = Subscription abgelaufen, aus Liste entfernen.
+      if (err.statusCode === 410 || err.statusCode === 404) {
         this.subs.delete(endpoint);
         console.log('[push/webpush] Subscription entfernt (expired)');
+        return endpoint;
       }
+      return null;
     }
   }
 }

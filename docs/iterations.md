@@ -1,5 +1,33 @@
 # Iterationen
 
+## 2026-05-14 - Iteration 4 Camera Capture Pipeline geplant
+
+Scope:
+
+- Iteration 4 als reine Foto-Pipeline geplant.
+- Entscheidung: kein HLS/Live-Video in der ersten Kamera-Iteration.
+- ESP32-CAM wird als separates Device angebunden:
+  - MQTT fuer Status, Events und Capture-Kommandos.
+  - HTTP-JPEG-Upload ans Backend.
+- Backend-Scope definiert:
+  - Capture-Upload-Endpunkt
+  - Capture-Bild-Endpunkt
+  - `captures`-Tabelle
+  - Docker-Volume fuer Bilddaten
+  - Audit-Events fuer Capture-Anforderung, Upload und Fehler
+- UI-Scope definiert:
+  - Fotos in der Feed-Historie
+  - Kamera-Status
+  - kleine Capture-Galerie
+- Sicherheitsrahmen definiert:
+  - Kamera bleibt nur ausgehend aktiv.
+  - Upload per Token/Shared Secret.
+  - Kamera-Credentials getrennt von CatFeeder-Credentials.
+
+Verifikation:
+
+- Plan in `docs/remote-platform-plan.md` dokumentiert.
+
 ## 2026-05-14 - Alert- und Push-Regeln gehärtet (Platform 0.6.0)
 
 Scope:

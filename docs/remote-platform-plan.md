@@ -19,6 +19,11 @@ ESP32
   -> Backend-Service
   -> React Dashboard
   -> Push-Service
+
+ESP32-CAM
+  -> MQTT Trigger
+  -> HTTP Foto-Upload
+  -> Backend Capture Store
 ```
 
 Der ESP wird nicht direkt aus dem Internet erreichbar gemacht. Es gibt kein
@@ -116,6 +121,14 @@ catfeeder/{deviceId}/health
 catfeeder/{deviceId}/event
 catfeeder/{deviceId}/feed/log
 catfeeder/{deviceId}/config/reported
+```
+
+Kamera:
+
+```text
+catfeeder/{cameraId}/status
+catfeeder/{cameraId}/event
+catfeeder/{cameraId}/cmd/capture
 ```
 
 Kommandos:
@@ -657,3 +670,146 @@ Naechster Block in Iteration 3:
 2. Push auf NAS mit ntfy.sh testen.
 3. Browser-Push auf Android und iOS-PWA gezielt testen.
 4. Audit-Ansicht filtern/suchbar machen.
+
+### Iteration 4 - Camera Capture Pipeline
+
+Status: geplant
+
+Ziel:
+
+- Ein zusaetzlicher ESP32-CAM dokumentiert Fuetterungen mit Fotos.
+- Es wird bewusst mit Fotos gestartet, nicht mit HLS/Live-Video.
+- Die Kamera wird nicht aus dem Internet exposed.
+
+Architektur:
+
+```text
+CatFeeder ESP32
+  -> feed/log oder feed/event per MQTT
+Backend
+  -> optional cmd/capture an ESP32-CAM
+ESP32-CAM
+  -> Foto aufnehmen
+  -> HTTP POST Upload ans Backend
+Backend
+  -> Datei in Docker-Volume speichern
+  -> Capture-Metadaten in Postgres
+React UI
+  -> Fotos in Feed-Historie anzeigen
+```
+
+Warum Fotos statt Streaming:
+
+- geringerer Bandbreitenbedarf
+- robuster auf ESP32-CAM Hardware
+- bessere Nachvollziehbarkeit in der Historie
+- keine dauerhafte Kamera-Verbindung nach aussen
+- passend zu Feed-Events, Blockaden und Audit
+
+Backend-Umfang:
+
+- Docker-Volume fuer Captures, z.B. `captures-data`.
+- Statische Auslieferung ueber Backend oder Frontend-Proxy:
+  - `GET /api/captures/:id/image`
+- Upload-Endpunkt:
+  - `POST /api/devices/:cameraId/captures`
+  - Payload: JPEG oder Multipart
+  - Header/Query fuer `reason`, `feedEventId`, `correlationId`
+- Datenbanktabelle `captures`:
+  - `id`
+  - `camera_id`
+  - `device_id`
+  - `created_at`
+  - `reason`
+  - `correlation_id`
+  - `feed_event_id`
+  - `file_path`
+  - `mime_type`
+  - `bytes`
+- Audit-Events:
+  - `capture.requested`
+  - `capture.uploaded`
+  - `capture.failed`
+
+MQTT-Topics:
+
+```text
+catfeeder/{cameraId}/status
+catfeeder/{cameraId}/event
+catfeeder/{cameraId}/cmd/capture
+```
+
+Capture-Kommando:
+
+```json
+{
+  "id": "capture-20260514-001",
+  "type": "capture",
+  "reason": "feed_done",
+  "deviceId": "catfeeder",
+  "correlationId": "feed-20260514-073000",
+  "uploadUrl": "https://catfeeder.example/api/devices/catfeeder-cam/captures",
+  "issuedAt": "2026-05-14T07:30:00+02:00"
+}
+```
+
+ESP32-CAM Umfang:
+
+- eigene PlatformIO-Firmware, z.B. `camera/` oder eigenes Projekt
+  `CatFeederCam`.
+- WLAN-Konfiguration analog CatFeeder.
+- MQTT-Konfiguration:
+  - host
+  - port
+  - user/pass
+  - cameraId
+  - linkedDeviceId
+- MQTT Subscribe:
+  - `catfeeder/{cameraId}/cmd/capture`
+- MQTT Publish:
+  - `status`
+  - `event`
+- HTTP Upload:
+  - JPEG Body mit `Content-Type: image/jpeg`
+  - Metadaten per Header oder Query
+- lokale Retry-Strategie:
+  - kleiner Retry bei Upload-Fehler
+  - kein dauerhaftes Speichern auf SD in erster Iteration
+
+Trigger-Strategie:
+
+- Backend triggert Kamera bei:
+  - remote Feed-Kommando
+  - `feed/log` mit `feed_done`
+  - `feed/log` mit `aborted=true`
+- Spaeter kann der CatFeeder ESP zusaetzlich direkt per MQTT triggern, damit
+  geplante lokale Fuetterungen auch ohne Backend-Entscheidung Fotos ausloesen.
+
+UI-Umfang:
+
+- Historie zeigt pro Feed-Event die letzten passenden Captures.
+- Capture-Galerie klein halten:
+  - Vorschaubild
+  - Zeitstempel
+  - Reason
+  - optional Vollbild-Ansicht
+- System/Kalibrierung zeigt Kamera-Status:
+  - online/offline
+  - letzter Upload
+  - letzte Capture-Fehler
+
+Sicherheit:
+
+- ESP32-CAM bleibt nur ausgehend aktiv.
+- Upload-Endpunkt bekommt mindestens ein Shared Secret/Token.
+- Token nicht im Frontend ausliefern.
+- Kamera-Credentials getrennt von CatFeeder-Credentials.
+- Captures nicht oeffentlich ohne Backend/API-Kontext ausliefern.
+
+Akzeptanz:
+
+- Manuelles Capture-Kommando erzeugt ein Bild im Backend.
+- Nach einer Fuetterung erscheint mindestens ein Foto in der Historie.
+- Bei Feed-Abbruch wird ein Foto als kritischer Kontext gespeichert.
+- Kamera-Offline erzeugt keinen Feed-Abbruch, aber einen sichtbaren Alert.
+- Keine Streaming-Abhaengigkeit.

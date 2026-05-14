@@ -9,7 +9,7 @@ import { PushService, type WebPushSubscription } from './push.js';
 
 const { Pool } = pg;
 
-const platformVersion = '0.7.0';
+const platformVersion = '0.7.1';
 const pushService = new PushService();
 const port = Number(process.env.PORT ?? 3000);
 const mqttUrl = process.env.MQTT_URL ?? 'mqtt://localhost:1883';
@@ -820,6 +820,7 @@ async function main() {
     alertCooldownMs,
     cameraDeviceId,
     captureUploadEnabled: true,
+    captureUploadTokenConfigured: captureUploadToken.length > 0,
   }));
 
   app.get('/api/events', async (_request, reply) => {
@@ -903,7 +904,15 @@ async function main() {
     };
     const headerToken = request.headers['x-capture-token'];
     const providedToken = Array.isArray(headerToken) ? headerToken[0] : headerToken ?? query.token ?? '';
-    if (captureUploadToken && providedToken !== captureUploadToken) {
+    if (!captureUploadToken) {
+      await auditLog(cameraLinkedDeviceId, 'system', 'capture', 'capture.rejected', {
+        cameraId,
+        reason: 'token-not-configured',
+      });
+      reply.code(503);
+      return { ok: false, error: 'capture-token-not-configured' };
+    }
+    if (providedToken !== captureUploadToken) {
       await auditLog(cameraLinkedDeviceId, 'device', 'capture', 'capture.rejected', {
         cameraId,
         reason: 'invalid-token',
@@ -917,6 +926,14 @@ async function main() {
     }
 
     const body = request.body;
+    if (body.length === 0) {
+      reply.code(400);
+      return { ok: false, error: 'empty-jpeg-body' };
+    }
+    if (body[0] !== 0xFF || body[1] !== 0xD8) {
+      reply.code(415);
+      return { ok: false, error: 'jpeg-soi-required' };
+    }
     const id = randomUUID();
     const deviceId = String(query.deviceId ?? cameraLinkedDeviceId);
     const reason = String(query.reason ?? 'manual');

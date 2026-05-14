@@ -115,7 +115,7 @@ function App() {
   const [feedGrams, setFeedGrams] = useState(5);
   const [feedServo, setFeedServo] = useState(0);
   const [notice, setNotice] = useState('');
-  const [platformVersion, setPlatformVersion] = useState('0.7.0');
+  const [platformVersion, setPlatformVersion] = useState('0.7.1');
   const [configDirty, setConfigDirty] = useState(false);
   const configDirtyRef = useRef(false);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
@@ -141,7 +141,7 @@ function App() {
     setConfigDirty(false);
     loadDevice().catch(() => undefined);
     api.get<Health>('/api/health')
-      .then((health) => setPlatformVersion(health.platformVersion ?? '0.7.0'))
+      .then((health) => setPlatformVersion(health.platformVersion ?? '0.7.1'))
       .catch(() => undefined);
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => undefined);

@@ -109,6 +109,13 @@ Der Kamera-Upload ist bewusst HTTP, weil ESP32-CAM HTTPS/TLS mit Reverse Proxy
 instabil ist. Der Upload bleibt ueber `X-Capture-Token` geschuetzt. Die UI und
 alle Browser-Zugriffe bleiben auf HTTPS.
 
+Sicherheitsregeln fuer Uploads:
+
+- `CAMERA_UPLOAD_TOKEN` muss gesetzt sein, sonst nimmt das Backend keine
+  Capture-Uploads an.
+- ESP32-CAM sendet den Token als `X-Capture-Token`.
+- Leere Uploads und Payloads ohne JPEG-Startmarker `FF D8` werden abgelehnt.
+
 ## API-Auszug
 
 ```text

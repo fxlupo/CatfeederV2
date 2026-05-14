@@ -1,5 +1,26 @@
 # Iterationen
 
+## 2026-05-14 - Capture Upload finalisiert (Platform 0.7.1, Camera 0.1.4)
+
+Scope:
+
+- Plattform-Version auf `0.7.1` gesetzt.
+- Camera-Firmware `0.1.4` als stabiler HTTP-Upload-Stand dokumentiert.
+- WebApp bleibt unter `https://tofu.creano.de`.
+- ESP32-CAM Upload laeuft ueber `http://catload.creano.de`.
+- Backend akzeptiert Capture-Uploads nur noch, wenn `CAMERA_UPLOAD_TOKEN`
+  gesetzt ist.
+- Uploads ohne oder mit falschem `X-Capture-Token` werden abgelehnt.
+- Leere Upload-Bodies werden abgelehnt.
+- Upload-Payload muss mit JPEG-SOI `FF D8` beginnen.
+- `/api/health` meldet, ob ein Capture-Upload-Token konfiguriert ist.
+
+Verifikation:
+
+- HTTP-Router mit curl gegen `catload.creano.de` pruefen.
+- ESP32-CAM Capture mit Firmware `0.1.4` pruefen.
+- Backend- und Frontend-Build lokal pruefen.
+
 ## 2026-05-14 - ESP32-CAM HTTP Payload Writes robuster
 
 Scope:

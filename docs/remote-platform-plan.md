@@ -673,8 +673,10 @@ Naechster Block in Iteration 3:
 
 ### Iteration 4 - Camera Capture Pipeline
 
-Status: Backend/UI-Basis umgesetzt in Platform `0.7.0`; ESP32-CAM Firmware-Basis
-als eigenes `camera/` PlatformIO-Unterprojekt angelegt.
+Status: umgesetzt als Platform `0.7.1` mit ESP32-CAM Firmware `0.1.4`.
+WebApp/UI bleibt auf `https://tofu.creano.de`; ESP32-CAM nutzt den getrennten
+HTTP-Upload-Kanal `http://catload.creano.de` mit verpflichtendem
+`X-Capture-Token`.
 
 Ziel:
 

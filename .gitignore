@@ -7,3 +7,4 @@ dist
 .vscode/launch.json
 .vscode/ipch
 src/wifi_credentials.h
+camera/src/camera_credentials.h

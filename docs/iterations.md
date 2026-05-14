@@ -1,5 +1,21 @@
 # Iterationen
 
+## 2026-05-14 - Iteration 4 ESP32-CAM Firmware-Basis
+
+Scope:
+
+- Eigenes PlatformIO-Unterprojekt `camera/` angelegt.
+- Firmware fuer AI-Thinker ESP32-CAM vorbereitet.
+- Kamera verbindet sich per WLAN und MQTT.
+- Kamera subscribed `catfeeder/{cameraId}/cmd/capture`.
+- Kamera nimmt JPEG auf und laedt es per HTTP POST ans Backend.
+- Kamera sendet Status- und Event-Meldungen.
+- Lokale `camera_credentials.h` wird nicht versioniert.
+
+Verifikation:
+
+- Camera-Build lokal pruefen.
+
 ## 2026-05-14 - Iteration 4 Capture-Backend und UI-Basis (Platform 0.7.0)
 
 Scope:

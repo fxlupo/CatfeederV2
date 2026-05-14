@@ -1,5 +1,21 @@
 # Iterationen
 
+## 2026-05-14 - ESP32-CAM HTTPS Upload stabilisiert
+
+Scope:
+
+- Kamera-Firmware auf `0.1.1` gesetzt.
+- Default-Capture fuer HTTPS auf `FRAMESIZE_VGA` und JPEG-Qualitaet `14`
+  reduziert, damit TLS mehr freien Heap bekommt.
+- Framebuffer auf einen Buffer reduziert.
+- TLS-Handshake- und HTTP-Timeout erhoeht.
+- Upload-Start loggt Heap, Min-Heap und JPEG-Bytes.
+- Kamera-Status meldet `minHeap`.
+
+Verifikation:
+
+- Camera-Build lokal pruefen.
+
 ## 2026-05-14 - ESP32-CAM Public-URL DNS gehärtet
 
 Scope:

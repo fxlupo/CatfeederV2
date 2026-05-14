@@ -60,7 +60,15 @@
 #define CAPTURE_UPLOAD_URL ""
 #endif
 
-#define FW_VERSION "0.1.0"
+#ifndef CAPTURE_FRAME_SIZE
+#define CAPTURE_FRAME_SIZE FRAMESIZE_VGA
+#endif
+
+#ifndef CAPTURE_JPEG_QUALITY
+#define CAPTURE_JPEG_QUALITY 14
+#endif
+
+#define FW_VERSION "0.1.1"
 #define MQTT_STATUS_INTERVAL_MS 10000UL
 #define MQTT_RECONNECT_INTERVAL_MS 3000UL
 #define WIFI_RECONNECT_INTERVAL_MS 5000UL
@@ -157,6 +165,7 @@ void publishStatus(bool retained = false) {
   doc["dns2"] = WiFi.dnsIP(1).toString();
   doc["mqttConnected"] = mqtt.connected();
   doc["heap"] = ESP.getFreeHeap();
+  doc["minHeap"] = ESP.getMinFreeHeap();
   doc["psram"] = psramFound();
   doc["uptimeS"] = millis() / 1000;
   doc["capturesOk"] = capturesOk;
@@ -187,9 +196,9 @@ bool setupCamera() {
   config.pin_reset = PIN_RESET;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = psramFound() ? FRAMESIZE_SVGA : FRAMESIZE_VGA;
-  config.jpeg_quality = 12;
-  config.fb_count = psramFound() ? 2 : 1;
+  config.frame_size = CAPTURE_FRAME_SIZE;
+  config.jpeg_quality = CAPTURE_JPEG_QUALITY;
+  config.fb_count = 1;
   config.fb_location = psramFound() ? CAMERA_FB_IN_PSRAM : CAMERA_FB_IN_DRAM;
   config.grab_mode = CAMERA_GRAB_LATEST;
 
@@ -215,8 +224,11 @@ bool postFrame(camera_fb_t* frame, String uploadUrl, const String& reason, const
 
   if (uploadUrl.startsWith("https://")) {
     secureClient.setInsecure();
+    secureClient.setTimeout(20000);
+    secureClient.setHandshakeTimeout(30);
     begun = http.begin(secureClient, uploadUrl);
   } else {
+    plainClient.setTimeout(20000);
     begun = http.begin(plainClient, uploadUrl);
   }
 
@@ -229,8 +241,10 @@ bool postFrame(camera_fb_t* frame, String uploadUrl, const String& reason, const
   if (String(CAPTURE_UPLOAD_TOKEN).length() > 0) {
     http.addHeader("X-Capture-Token", CAPTURE_UPLOAD_TOKEN);
   }
-  http.setTimeout(15000);
+  http.setReuse(false);
+  http.setTimeout(30000);
 
+  Serial.printf("[capture] upload start heap=%u minHeap=%u bytes=%u\n", ESP.getFreeHeap(), ESP.getMinFreeHeap(), frame->len);
   const int code = http.POST(frame->buf, frame->len);
   const String response = http.getString();
   http.end();

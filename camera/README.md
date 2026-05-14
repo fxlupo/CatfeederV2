@@ -34,6 +34,8 @@ Dann Werte anpassen:
 #define LINKED_DEVICE_ID "catfeeder"
 #define CAPTURE_UPLOAD_TOKEN "..."
 #define CAPTURE_UPLOAD_URL "https://tofu.creano.de/api/devices/catfeeder-cam/captures"
+#define CAPTURE_FRAME_SIZE FRAMESIZE_VGA
+#define CAPTURE_JPEG_QUALITY 14
 ```
 
 `camera_credentials.h` ist in `.gitignore`.
@@ -42,6 +44,11 @@ Die Kamera soll spaeter auch aus fremden WLANs per Public URL hochladen. Darum
 setzt die Firmware explizite DNS-Server. Im Status werden `dns1` und `dns2`
 mitgesendet; wenn Public-Uploads mit `DNS Failed` scheitern, diese Werte zuerst
 pruefen.
+
+HTTPS braucht auf dem ESP32-CAM zusaetzlichen Heap fuer TLS. Deshalb ist die
+Default-Aufloesung bewusst konservativ auf VGA gesetzt. Wenn Uploads stabil
+laufen, kann spaeter testweise `FRAMESIZE_SVGA` und `CAPTURE_JPEG_QUALITY 12`
+genutzt werden.
 
 ## Build
 

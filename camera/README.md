@@ -59,8 +59,8 @@ Bei Public-URL Uploads loggt die Firmware vor dem Upload:
 ```
 
 Ab Firmware `0.1.3` nutzt der Upload keinen `HTTPClient` mehr, sondern einen
-manuellen HTTP/1.1 POST mit `Content-Length` und 1024-Byte-Schreibbloecken.
-Das vermeidet instabile Chunk-/Payload-Fehler auf dem ESP32-CAM.
+manuellen HTTP/1.1 POST mit `Content-Length`. Ab `0.1.4` wird der Payload in
+512-Byte-Bloecken mit Retry bei kurzen Write-Stalls gesendet.
 
 ## Build
 

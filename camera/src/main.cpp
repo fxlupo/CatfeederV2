@@ -67,7 +67,7 @@
 #define CAPTURE_JPEG_QUALITY 14
 #endif
 
-#define FW_VERSION "0.1.3"
+#define FW_VERSION "0.1.4"
 #define MQTT_STATUS_INTERVAL_MS 10000UL
 #define MQTT_RECONNECT_INTERVAL_MS 3000UL
 #define WIFI_RECONNECT_INTERVAL_MS 5000UL
@@ -189,11 +189,27 @@ bool probeTcp(const String& url) {
 
 bool writeAll(Client& client, const uint8_t* data, size_t length) {
   size_t sent = 0;
+  unsigned long lastProgressAt = millis();
   while (sent < length) {
-    const size_t chunk = min(static_cast<size_t>(1024), length - sent);
+    const size_t chunk = min(static_cast<size_t>(512), length - sent);
     const size_t written = client.write(data + sent, chunk);
-    if (written == 0) return false;
+    if (written == 0) {
+      if (!client.connected()) {
+        Serial.printf("[capture] write disconnected sent=%u/%u\n", sent, length);
+        return false;
+      }
+      if (millis() - lastProgressAt > 10000) {
+        Serial.printf("[capture] write timeout sent=%u/%u\n", sent, length);
+        return false;
+      }
+      delay(20);
+      continue;
+    }
     sent += written;
+    lastProgressAt = millis();
+    if (sent == written || sent == length || sent % 4096 < written) {
+      Serial.printf("[capture] write progress %u/%u\n", sent, length);
+    }
     delay(1);
   }
   return true;

@@ -1,5 +1,18 @@
 # Iterationen
 
+## 2026-05-14 - ESP32-CAM HTTP Payload Writes robuster
+
+Scope:
+
+- Kamera-Firmware auf `0.1.4` gesetzt.
+- Upload-Payload wird in 512-Byte-Bloecken gesendet.
+- Kurze Write-Stalls werden bis 10 Sekunden retryt statt sofort abzubrechen.
+- Upload-Progress wird alle ca. 4 KB geloggt.
+
+Verifikation:
+
+- Camera-Build lokal pruefen.
+
 ## 2026-05-14 - Kamera-Upload auf getrennte HTTP-Domain gelegt
 
 Scope:

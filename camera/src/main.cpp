@@ -68,7 +68,7 @@
 #define CAPTURE_JPEG_QUALITY 14
 #endif
 
-#define FW_VERSION "0.1.1"
+#define FW_VERSION "0.1.2"
 #define MQTT_STATUS_INTERVAL_MS 10000UL
 #define MQTT_RECONNECT_INTERVAL_MS 3000UL
 #define WIFI_RECONNECT_INTERVAL_MS 5000UL
@@ -134,6 +134,55 @@ String addQuery(String url, const String& key, const String& value) {
   url += '=';
   url += urlEncode(value);
   return url;
+}
+
+bool parseUrlHostPort(const String& url, String& host, uint16_t& port) {
+  const int schemeEnd = url.indexOf("://");
+  if (schemeEnd < 0) return false;
+  const String scheme = url.substring(0, schemeEnd);
+  int hostStart = schemeEnd + 3;
+  int hostEnd = url.indexOf('/', hostStart);
+  if (hostEnd < 0) hostEnd = url.length();
+  String hostPort = url.substring(hostStart, hostEnd);
+  const int at = hostPort.lastIndexOf('@');
+  if (at >= 0) hostPort = hostPort.substring(at + 1);
+  const int colon = hostPort.lastIndexOf(':');
+  if (colon > 0) {
+    host = hostPort.substring(0, colon);
+    port = static_cast<uint16_t>(hostPort.substring(colon + 1).toInt());
+  } else {
+    host = hostPort;
+    port = scheme == "https" ? 443 : 80;
+  }
+  return host.length() > 0 && port > 0;
+}
+
+bool probeTcp(const String& url) {
+  String host;
+  uint16_t port = 0;
+  if (!parseUrlHostPort(url, host, port)) {
+    Serial.printf("[net] url parse failed: %s\n", url.c_str());
+    return false;
+  }
+
+  IPAddress ip;
+  const bool dnsOk = WiFi.hostByName(host.c_str(), ip);
+  Serial.printf("[net] host=%s port=%u dns=%s ip=%s\n", host.c_str(), port, dnsOk ? "ok" : "fail", ip.toString().c_str());
+  if (!dnsOk) {
+    lastError = "dns-failed-" + host;
+    return false;
+  }
+
+  WiFiClient probe;
+  probe.setTimeout(5000);
+  const bool tcpOk = probe.connect(host.c_str(), port, 5000);
+  Serial.printf("[net] tcp %s:%u %s\n", host.c_str(), port, tcpOk ? "ok" : "fail");
+  probe.stop();
+  if (!tcpOk) {
+    lastError = "tcp-failed-" + host + ":" + String(port);
+    return false;
+  }
+  return true;
 }
 
 void publishJson(const String& topic, JsonDocument& doc, bool retained = false) {
@@ -223,11 +272,13 @@ bool postFrame(camera_fb_t* frame, String uploadUrl, const String& reason, const
   bool begun = false;
 
   if (uploadUrl.startsWith("https://")) {
+    if (!probeTcp(uploadUrl)) return false;
     secureClient.setInsecure();
     secureClient.setTimeout(20000);
     secureClient.setHandshakeTimeout(30);
     begun = http.begin(secureClient, uploadUrl);
   } else {
+    if (!probeTcp(uploadUrl)) return false;
     plainClient.setTimeout(20000);
     begun = http.begin(plainClient, uploadUrl);
   }
@@ -251,7 +302,7 @@ bool postFrame(camera_fb_t* frame, String uploadUrl, const String& reason, const
 
   Serial.printf("[capture] upload http=%d bytes=%u\n", code, frame->len);
   if (code < 200 || code >= 300) {
-    lastError = "upload-http-" + String(code);
+    lastError = code < 0 ? "upload-connect-failed" : "upload-http-" + String(code);
     Serial.println(response);
     return false;
   }

@@ -1,5 +1,22 @@
 # Iterationen
 
+## 2026-05-14 - ESP32-CAM Upload-Diagnose erweitert
+
+Scope:
+
+- Kamera-Firmware auf `0.1.2` gesetzt.
+- Public-Upload diagnostiziert vor HTTP/HTTPS:
+  - URL Host/Port
+  - DNS Ergebnis
+  - TCP-Verbindung zum Zielport
+- Negative HTTPClient-Resultate werden als `upload-connect-failed` im Status
+  sichtbar.
+- Camera-README um TLS-Diagnosehinweise erweitert.
+
+Verifikation:
+
+- Camera-Build lokal pruefen.
+
 ## 2026-05-14 - ESP32-CAM HTTPS Upload stabilisiert
 
 Scope:

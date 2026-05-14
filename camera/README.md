@@ -50,6 +50,17 @@ Default-Aufloesung bewusst konservativ auf VGA gesetzt. Wenn Uploads stabil
 laufen, kann spaeter testweise `FRAMESIZE_SVGA` und `CAPTURE_JPEG_QUALITY 12`
 genutzt werden.
 
+Bei Public-URL Uploads loggt die Firmware vor dem HTTPS-Upload:
+
+```text
+[net] host=... port=443 dns=ok ip=...
+[net] tcp ...:443 ok
+[capture] upload start heap=... minHeap=... bytes=...
+```
+
+Wenn TCP ok ist, aber danach `start_ssl_client: -1` kommt, liegt das Problem
+am TLS-Handshake zwischen ESP32 und Reverse Proxy, nicht an DNS oder Routing.
+
 ## Build
 
 ```sh

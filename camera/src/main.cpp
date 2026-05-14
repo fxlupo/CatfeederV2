@@ -20,6 +20,14 @@
 #define WIFI_PASS ""
 #endif
 
+#ifndef WIFI_DNS1
+#define WIFI_DNS1 "1.1.1.1"
+#endif
+
+#ifndef WIFI_DNS2
+#define WIFI_DNS2 "8.8.8.8"
+#endif
+
 #ifndef MQTT_HOST
 #define MQTT_HOST ""
 #endif
@@ -87,6 +95,7 @@ static unsigned long lastWifiReconnectAt = 0;
 static uint32_t capturesOk = 0;
 static uint32_t capturesFailed = 0;
 static String lastError;
+static bool wifiConfigApplied = false;
 
 String jsonString(JsonDocument& doc) {
   String out;
@@ -144,6 +153,8 @@ void publishStatus(bool retained = false) {
   doc["deviceId"] = LINKED_DEVICE_ID;
   doc["ip"] = WiFi.localIP().toString();
   doc["wifiRssi"] = WiFi.RSSI();
+  doc["dns1"] = WiFi.dnsIP(0).toString();
+  doc["dns2"] = WiFi.dnsIP(1).toString();
   doc["mqttConnected"] = mqtt.connected();
   doc["heap"] = ESP.getFreeHeap();
   doc["psram"] = psramFound();
@@ -297,6 +308,15 @@ void ensureWifi() {
   Serial.printf("[wifi] connecting to %s\n", WIFI_SSID);
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
+  if (!wifiConfigApplied) {
+    IPAddress dns1;
+    IPAddress dns2;
+    dns1.fromString(WIFI_DNS1);
+    dns2.fromString(WIFI_DNS2);
+    WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, dns1, dns2);
+    wifiConfigApplied = true;
+    Serial.printf("[wifi] dns %s / %s\n", dns1.toString().c_str(), dns2.toString().c_str());
+  }
   WiFi.begin(WIFI_SSID, WIFI_PASS);
 }
 

@@ -1,5 +1,20 @@
 # Iterationen
 
+## 2026-05-14 - ESP32-CAM Public-URL DNS gehärtet
+
+Scope:
+
+- ESP32-CAM Firmware setzt explizite DNS-Server fuer Public-URL Uploads.
+- Kamera-Status meldet `dns1` und `dns2`.
+- Beispiel-Credentials und Camera-README dokumentieren `WIFI_DNS1` und
+  `WIFI_DNS2`.
+- USB-Upload-Port und konservativer Upload-Speed fuer das ESP32-CAM Dev-Board
+  in `camera/platformio.ini` gesetzt.
+
+Verifikation:
+
+- Camera-Build lokal pruefen.
+
 ## 2026-05-14 - Iteration 4 ESP32-CAM Firmware-Basis
 
 Scope:

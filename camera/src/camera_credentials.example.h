@@ -5,6 +5,10 @@
 
 #define WIFI_SSID "dein-wlan"
 #define WIFI_PASS "dein-passwort"
+// Explizite DNS-Server, damit Public URLs auch in fremden WLANs robust
+// aufgeloest werden. Bei Bedarf durch lokale DNS-Server ersetzen.
+#define WIFI_DNS1 "1.1.1.1"
+#define WIFI_DNS2 "8.8.8.8"
 
 #define MQTT_HOST "10.18.3.50"
 #define MQTT_PORT 1883

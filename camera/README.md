@@ -22,6 +22,8 @@ Dann Werte anpassen:
 ```cpp
 #define WIFI_SSID "..."
 #define WIFI_PASS "..."
+#define WIFI_DNS1 "1.1.1.1"
+#define WIFI_DNS2 "8.8.8.8"
 
 #define MQTT_HOST "10.18.3.50"
 #define MQTT_PORT 1883
@@ -35,6 +37,11 @@ Dann Werte anpassen:
 ```
 
 `camera_credentials.h` ist in `.gitignore`.
+
+Die Kamera soll spaeter auch aus fremden WLANs per Public URL hochladen. Darum
+setzt die Firmware explizite DNS-Server. Im Status werden `dns1` und `dns2`
+mitgesendet; wenn Public-Uploads mit `DNS Failed` scheitern, diese Werte zuerst
+pruefen.
 
 ## Build
 

@@ -1,5 +1,24 @@
 # Iterationen
 
+## 2026-05-14 - Kamera-Upload auf getrennte HTTP-Domain gelegt
+
+Scope:
+
+- Zielbild festgelegt:
+  - WebApp/UI: `https://tofu.creano.de`
+  - ESP32-CAM Upload: `http://catload.creano.de`
+- Traefik-Override routet `UPLOAD_HOST` direkt an den Backend-Service.
+- Upload-Router ist HTTP-only und per `PathRegexp` auf
+  `/api/devices/{cameraId}/captures` begrenzt.
+- Backend nutzt `PUBLIC_BASE_URL=http://catload.creano.de` fuer
+  Capture-Kommandos.
+- Camera-Beispiele und Doku auf `catload.creano.de` aktualisiert.
+
+Verifikation:
+
+- Compose-Konfiguration auf NAS pruefen.
+- HTTP-Capture-Upload per ESP32-CAM testen.
+
 ## 2026-05-14 - ESP32-CAM Upload ohne HTTPClient
 
 Scope:

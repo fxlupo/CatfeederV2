@@ -23,7 +23,7 @@
 
 // Fallback, falls das MQTT-Kommando keine uploadUrl enthaelt.
 // Fuer lokalen Betrieb kann hier auch http://<NAS-IP>:3001/... stehen.
-#define CAPTURE_UPLOAD_URL "https://tofu.creano.de/api/devices/catfeeder-cam/captures"
+#define CAPTURE_UPLOAD_URL "http://catload.creano.de/api/devices/catfeeder-cam/captures"
 
 // HTTPS braucht auf dem ESP32-CAM zusaetzlichen Heap fuer TLS.
 // VGA/14 ist bewusst konservativ; spaeter kann man auf SVGA/12 hochgehen.

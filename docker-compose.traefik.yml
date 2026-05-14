@@ -1,4 +1,16 @@
 services:
+  backend:
+    networks:
+      - default
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.catfeeder-upload.rule=Host(`${UPLOAD_HOST}`) && PathRegexp(`^/api/devices/[^/]+/captures$`)
+      - traefik.http.routers.catfeeder-upload.entrypoints=http
+      - traefik.http.routers.catfeeder-upload.priority=20
+      - traefik.http.services.catfeeder-backend.loadbalancer.server.port=3000
+
   frontend:
     networks:
       - default

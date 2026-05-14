@@ -64,7 +64,8 @@ MQTT_CAMERA_ID=catfeeder-cam
 MQTT_CAMERA_USER=catfeeder_cam
 MQTT_CAMERA_PASS=catfeeder-camera-change-me
 CAMERA_UPLOAD_TOKEN=catfeeder-camera-token-change-me
-PUBLIC_BASE_URL=https://catfeeder.example.de
+UPLOAD_HOST=catload.creano.de
+PUBLIC_BASE_URL=http://catload.creano.de
 ```
 
 Upload-Endpunkt:
@@ -93,12 +94,20 @@ docker compose -f docker-compose.yml -f docker-compose.traefik.yml up --build -d
 Relevante `.env` Werte:
 
 ```text
-PUBLIC_HOST=catfeeder.mydomain.de
+PUBLIC_HOST=tofu.creano.de
+UPLOAD_HOST=catload.creano.de
+PUBLIC_BASE_URL=http://catload.creano.de
 TRAEFIK_CERTRESOLVER=http
 ```
 
-Die Labels werden nur auf den Frontend-Container gesetzt. Das Frontend proxyt
-`/api` intern an das Backend.
+Traefik-Routing:
+
+- `https://tofu.creano.de` -> Frontend/WebApp
+- `http://catload.creano.de/api/devices/{cameraId}/captures` -> Backend Upload
+
+Der Kamera-Upload ist bewusst HTTP, weil ESP32-CAM HTTPS/TLS mit Reverse Proxy
+instabil ist. Der Upload bleibt ueber `X-Capture-Token` geschuetzt. Die UI und
+alle Browser-Zugriffe bleiben auf HTTPS.
 
 ## API-Auszug
 

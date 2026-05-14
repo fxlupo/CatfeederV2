@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <HTTPClient.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
@@ -68,7 +67,7 @@
 #define CAPTURE_JPEG_QUALITY 14
 #endif
 
-#define FW_VERSION "0.1.2"
+#define FW_VERSION "0.1.3"
 #define MQTT_STATUS_INTERVAL_MS 10000UL
 #define MQTT_RECONNECT_INTERVAL_MS 3000UL
 #define WIFI_RECONNECT_INTERVAL_MS 5000UL
@@ -136,13 +135,14 @@ String addQuery(String url, const String& key, const String& value) {
   return url;
 }
 
-bool parseUrlHostPort(const String& url, String& host, uint16_t& port) {
+bool parseUrl(const String& url, String& scheme, String& host, uint16_t& port, String& path) {
   const int schemeEnd = url.indexOf("://");
   if (schemeEnd < 0) return false;
-  const String scheme = url.substring(0, schemeEnd);
+  scheme = url.substring(0, schemeEnd);
   int hostStart = schemeEnd + 3;
   int hostEnd = url.indexOf('/', hostStart);
   if (hostEnd < 0) hostEnd = url.length();
+  path = hostEnd < url.length() ? url.substring(hostEnd) : "/";
   String hostPort = url.substring(hostStart, hostEnd);
   const int at = hostPort.lastIndexOf('@');
   if (at >= 0) hostPort = hostPort.substring(at + 1);
@@ -154,13 +154,15 @@ bool parseUrlHostPort(const String& url, String& host, uint16_t& port) {
     host = hostPort;
     port = scheme == "https" ? 443 : 80;
   }
-  return host.length() > 0 && port > 0;
+  return scheme.length() > 0 && host.length() > 0 && port > 0 && path.length() > 0;
 }
 
 bool probeTcp(const String& url) {
+  String scheme;
   String host;
+  String path;
   uint16_t port = 0;
-  if (!parseUrlHostPort(url, host, port)) {
+  if (!parseUrl(url, scheme, host, port, path)) {
     Serial.printf("[net] url parse failed: %s\n", url.c_str());
     return false;
   }
@@ -180,6 +182,67 @@ bool probeTcp(const String& url) {
   probe.stop();
   if (!tcpOk) {
     lastError = "tcp-failed-" + host + ":" + String(port);
+    return false;
+  }
+  return true;
+}
+
+bool writeAll(Client& client, const uint8_t* data, size_t length) {
+  size_t sent = 0;
+  while (sent < length) {
+    const size_t chunk = min(static_cast<size_t>(1024), length - sent);
+    const size_t written = client.write(data + sent, chunk);
+    if (written == 0) return false;
+    sent += written;
+    delay(1);
+  }
+  return true;
+}
+
+int readHttpStatus(Client& client) {
+  const unsigned long deadline = millis() + 15000;
+  while (client.connected() && !client.available() && millis() < deadline) {
+    delay(10);
+  }
+  if (!client.available()) return -1;
+  const String statusLine = client.readStringUntil('\n');
+  Serial.printf("[capture] response %s\n", statusLine.c_str());
+  const int firstSpace = statusLine.indexOf(' ');
+  if (firstSpace < 0) return -1;
+  return statusLine.substring(firstSpace + 1, firstSpace + 4).toInt();
+}
+
+bool sendManualPost(Client& client, const String& host, const String& path, camera_fb_t* frame) {
+  String headers;
+  headers.reserve(320);
+  headers += "POST ";
+  headers += path;
+  headers += " HTTP/1.1\r\nHost: ";
+  headers += host;
+  headers += "\r\nUser-Agent: CatFeederCam/";
+  headers += FW_VERSION;
+  headers += "\r\nConnection: close\r\nContent-Type: image/jpeg\r\nContent-Length: ";
+  headers += String(frame->len);
+  headers += "\r\n";
+  if (String(CAPTURE_UPLOAD_TOKEN).length() > 0) {
+    headers += "X-Capture-Token: ";
+    headers += CAPTURE_UPLOAD_TOKEN;
+    headers += "\r\n";
+  }
+  headers += "\r\n";
+
+  if (client.print(headers) != headers.length()) {
+    lastError = "upload-header-failed";
+    return false;
+  }
+  if (!writeAll(client, frame->buf, frame->len)) {
+    lastError = "upload-payload-failed";
+    return false;
+  }
+
+  const int code = readHttpStatus(client);
+  if (code < 200 || code >= 300) {
+    lastError = code < 0 ? "upload-response-failed" : "upload-http-" + String(code);
     return false;
   }
   return true;
@@ -266,44 +329,45 @@ bool postFrame(camera_fb_t* frame, String uploadUrl, const String& reason, const
   uploadUrl = addQuery(uploadUrl, "correlationId", correlationId);
   uploadUrl = addQuery(uploadUrl, "feedEventId", feedEventId);
 
-  HTTPClient http;
-  WiFiClient plainClient;
-  WiFiClientSecure secureClient;
-  bool begun = false;
-
-  if (uploadUrl.startsWith("https://")) {
-    if (!probeTcp(uploadUrl)) return false;
-    secureClient.setInsecure();
-    secureClient.setTimeout(20000);
-    secureClient.setHandshakeTimeout(30);
-    begun = http.begin(secureClient, uploadUrl);
-  } else {
-    if (!probeTcp(uploadUrl)) return false;
-    plainClient.setTimeout(20000);
-    begun = http.begin(plainClient, uploadUrl);
-  }
-
-  if (!begun) {
-    lastError = "http-begin-failed";
+  String scheme;
+  String host;
+  String path;
+  uint16_t port = 0;
+  if (!parseUrl(uploadUrl, scheme, host, port, path)) {
+    lastError = "upload-url-invalid";
     return false;
   }
 
-  http.addHeader("Content-Type", "image/jpeg");
-  if (String(CAPTURE_UPLOAD_TOKEN).length() > 0) {
-    http.addHeader("X-Capture-Token", CAPTURE_UPLOAD_TOKEN);
-  }
-  http.setReuse(false);
-  http.setTimeout(30000);
+  if (!probeTcp(uploadUrl)) return false;
 
   Serial.printf("[capture] upload start heap=%u minHeap=%u bytes=%u\n", ESP.getFreeHeap(), ESP.getMinFreeHeap(), frame->len);
-  const int code = http.POST(frame->buf, frame->len);
-  const String response = http.getString();
-  http.end();
 
-  Serial.printf("[capture] upload http=%d bytes=%u\n", code, frame->len);
-  if (code < 200 || code >= 300) {
-    lastError = code < 0 ? "upload-connect-failed" : "upload-http-" + String(code);
-    Serial.println(response);
+  bool ok = false;
+  if (scheme == "https") {
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure();
+    secureClient.setTimeout(20000);
+    secureClient.setHandshakeTimeout(30);
+    if (!secureClient.connect(host.c_str(), port)) {
+      lastError = "tls-connect-failed";
+      Serial.printf("[capture] tls connect failed host=%s port=%u\n", host.c_str(), port);
+      return false;
+    }
+    ok = sendManualPost(secureClient, host, path, frame);
+    secureClient.stop();
+  } else {
+    WiFiClient plainClient;
+    plainClient.setTimeout(20000);
+    if (!plainClient.connect(host.c_str(), port, 10000)) {
+      lastError = "tcp-connect-failed";
+      return false;
+    }
+    ok = sendManualPost(plainClient, host, path, frame);
+    plainClient.stop();
+  }
+
+  Serial.printf("[capture] upload %s bytes=%u error=%s\n", ok ? "ok" : "failed", frame->len, lastError.c_str());
+  if (!ok) {
     return false;
   }
   return true;

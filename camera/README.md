@@ -61,6 +61,10 @@ Bei Public-URL Uploads loggt die Firmware vor dem HTTPS-Upload:
 Wenn TCP ok ist, aber danach `start_ssl_client: -1` kommt, liegt das Problem
 am TLS-Handshake zwischen ESP32 und Reverse Proxy, nicht an DNS oder Routing.
 
+Ab Firmware `0.1.3` nutzt der Upload keinen `HTTPClient` mehr, sondern einen
+manuellen HTTP/1.1 POST mit `Content-Length` und 1024-Byte-Schreibbloecken.
+Das vermeidet instabile Chunk-/Payload-Fehler auf dem ESP32-CAM.
+
 ## Build
 
 ```sh

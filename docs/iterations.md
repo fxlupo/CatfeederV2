@@ -1,5 +1,20 @@
 # Iterationen
 
+## 2026-05-14 - ESP32-CAM Upload ohne HTTPClient
+
+Scope:
+
+- Kamera-Firmware auf `0.1.3` gesetzt.
+- JPEG-Upload nutzt keinen Arduino `HTTPClient` mehr.
+- Upload sendet einen manuellen HTTP/1.1 POST mit `Content-Length`.
+- Payload wird in 1024-Byte-Bloecken geschrieben.
+- Fehler werden genauer als Header-, Payload-, TLS- oder Response-Fehler
+  gemeldet.
+
+Verifikation:
+
+- Camera-Build lokal pruefen.
+
 ## 2026-05-14 - ESP32-CAM Upload-Diagnose erweitert
 
 Scope:
